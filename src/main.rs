@@ -7,6 +7,7 @@ pub mod separate_traversal;
 pub mod matrix;
 pub mod ray;
 pub mod combined_traversal;
+pub mod bounds;
 
 pub fn is_line_free<M: Matrix<Item = f32>>(
     matrix: &M,

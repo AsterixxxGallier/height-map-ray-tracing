@@ -20,6 +20,7 @@ impl XBoundaryTraversal {
         // how much y-movement happens when we move by one pixel in the x-direction
         let step_y = ray.diff_y / ray.diff_x;
         // how far along the ray we have to move for the x-component of the movement to equal 1.0
+        // TODO: should this be .recip().abs()? (see CombinedBoundaryTraversal; same for XBoun.Tr.)
         let t_delta_x = ray.diff_x.recip();
         let mut x = ray.start_x;
         let mut y = ray.start_y;
@@ -70,7 +71,7 @@ impl Iterator for XBoundaryTraversal {
     fn next(&mut self) -> Option<Self::Item> {
         let item = XBoundaryCrossing {
             t: self.t,
-            last_x_index: self.x as isize - 1,
+            last_x_index: (self.x - self.step_x) as isize,
             next_x_index: self.x as isize,
             y_index: self.y as isize,
         };

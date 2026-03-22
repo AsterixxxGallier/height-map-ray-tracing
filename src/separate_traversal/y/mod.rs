@@ -68,7 +68,7 @@ impl Iterator for YBoundaryTraversal {
         let item = YBoundaryCrossing {
             t: self.t,
             x_index: self.x as isize,
-            last_y_index: self.y as isize - 1,
+            last_y_index: (self.y - self.step_y) as isize,
             next_y_index: self.y as isize,
         };
 

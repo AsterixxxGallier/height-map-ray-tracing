@@ -1,3 +1,4 @@
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Ray {
     pub start_x: f32,
     pub start_y: f32,
