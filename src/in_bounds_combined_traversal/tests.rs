@@ -77,6 +77,47 @@ fn only_x_increasing_starts_out_of_bounds() {
 }
 
 #[test]
+fn only_x_increasing_ends_out_of_bounds() {
+    let bounds = Bounds::origin_square(4);
+    let ray = Ray {
+        start_x: 0.0,
+        start_y: 0.0,
+        diff_x: 10.0,
+        diff_y: 0.0,
+    };
+
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
+
+    dbg!(&traversal);
+
+    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+        t: 0.1,
+        last_x_index: 0,
+        next_x_index: 1,
+        y_index: 0,
+    }));
+    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+        t: 0.2,
+        last_x_index: 1,
+        next_x_index: 2,
+        y_index: 0,
+    }));
+    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+        t: 0.3,
+        last_x_index: 2,
+        next_x_index: 3,
+        y_index: 0,
+    }));
+    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+        t: 0.4,
+        last_x_index: 3,
+        next_x_index: 4,
+        y_index: 0,
+    }));
+    assert_eq!(traversal.next(), None);
+}
+
+#[test]
 fn only_x_decreasing() {
     let bounds = Bounds::origin_square(4);
     let ray = Ray {

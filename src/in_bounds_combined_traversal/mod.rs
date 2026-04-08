@@ -124,16 +124,23 @@ impl CombinedBoundaryTraversal {
         };
 
         let x_crossings = if ray.diff_x > 0.0 {
-            // number of integers between ray.start_x and ray.end_x()
-            (ray.end_x().ceil() - ray.start_x.floor()) as usize - 1
+            // If the ray moves out of bounds in the x-direction, it is stopped right after crossing
+            // the last in-bounds pixel boundary.
+            let actual_end_x = ray.end_x().min(bounds.max_x as f32 + 1.0);
+
+            // number of integers between ray.start_x and actual_end_x
+            (actual_end_x.ceil() - ray.start_x.floor()) as usize - 1
         } else if ray.diff_x < 0.0 {
-            (ray.start_x.ceil() - ray.end_x().floor()) as usize - 1
+            let actual_end_x = ray.end_x().max(bounds.min_x as f32 - 1.0);
+            (ray.start_x.ceil() - actual_end_x.floor()) as usize - 1
         } else {
             0
         };
         let y_crossings = if ray.diff_y > 0.0 {
+            let actual_end_y = ray.end_y().min(bounds.max_y as f32 + 1.0);
             (ray.end_y().ceil() - ray.start_y.floor()) as usize - 1
         } else if ray.diff_y < 0.0 {
+            let actual_end_y = ray.end_y().max(bounds.min_y as f32 - 1.0);
             (ray.start_y.ceil() - ray.end_y().floor()) as usize - 1
         } else {
             0
