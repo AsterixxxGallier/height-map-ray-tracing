@@ -1,9 +1,10 @@
 use crate::bounds::Bounds;
-use crate::combined_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
+use crate::in_bounds_combined_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
 use crate::ray::Ray;
 
 #[test]
 fn only_x_increasing() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: 0.0,
         start_y: 0.0,
@@ -11,7 +12,7 @@ fn only_x_increasing() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,
@@ -36,6 +37,7 @@ fn only_x_increasing() {
 
 #[test]
 fn only_x_increasing_starts_out_of_bounds() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: -1.0,
         start_y: 0.0,
@@ -43,7 +45,7 @@ fn only_x_increasing_starts_out_of_bounds() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     dbg!(&traversal);
 
@@ -76,6 +78,7 @@ fn only_x_increasing_starts_out_of_bounds() {
 
 #[test]
 fn only_x_decreasing() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: 4.0,
         start_y: 0.0,
@@ -83,7 +86,7 @@ fn only_x_decreasing() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,
@@ -108,6 +111,7 @@ fn only_x_decreasing() {
 
 #[test]
 fn only_y_increasing() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: 0.0,
         start_y: 0.0,
@@ -115,7 +119,7 @@ fn only_y_increasing() {
         diff_y: 4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
         t: 0.25,
@@ -140,6 +144,7 @@ fn only_y_increasing() {
 
 #[test]
 fn only_y_decreasing() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: 0.0,
         start_y: 4.0,
@@ -147,7 +152,7 @@ fn only_y_decreasing() {
         diff_y: -4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
         t: 0.25,
@@ -172,6 +177,7 @@ fn only_y_decreasing() {
 
 #[test]
 fn perfectly_diagonal_increasing() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: 0.0,
         start_y: 0.0,
@@ -179,7 +185,7 @@ fn perfectly_diagonal_increasing() {
         diff_y: 4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,
@@ -225,6 +231,7 @@ fn perfectly_diagonal_increasing() {
 
 #[test]
 fn perfectly_diagonal_decreasing() {
+    let bounds = Bounds::origin_square(4);
     let ray = Ray {
         start_x: 4.0,
         start_y: 4.0,
@@ -232,7 +239,7 @@ fn perfectly_diagonal_decreasing() {
         diff_y: -4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,
@@ -278,6 +285,7 @@ fn perfectly_diagonal_decreasing() {
 
 #[test]
 fn half_diagonal_increasing() {
+    let bounds = Bounds::origin_rectangle(4, 2);
     let ray = Ray {
         start_x: 0.0,
         start_y: 0.0,
@@ -285,7 +293,7 @@ fn half_diagonal_increasing() {
         diff_y: 2.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray, bounds);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,

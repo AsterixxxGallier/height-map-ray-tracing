@@ -6,6 +6,7 @@ use crate::ray::Ray;
 pub mod separate_traversal;
 pub mod matrix;
 pub mod ray;
+pub mod in_bounds_combined_traversal;
 pub mod combined_traversal;
 pub mod bounds;
 

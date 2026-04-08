@@ -5,6 +5,24 @@ use crate::ray::Ray;
 #[cfg(test)]
 mod tests;
 
+/// Based on A Fast Voxel Traversal Algorithm by Amanatides and Woo.
+///
+/// Iterator over [`BoundaryCrossing`]s, where a boundary is considered crossed if the [`Ray`] is
+/// on both of its sides. For x-boundaries, this means that the ray is on the left and right sides
+/// of the boundary. For y-boundaries, this means that the ray is on the top and bottom sides of the
+/// boundary. It does not suffice for the ray start or end to touch a boundary.
+///
+/// When the ray hits a grid corner (e.g. x and y are both integers at the same time), the
+/// x-boundary crossing is produced first, then the y-boundary crossing.
+///
+/// All crossings produced will be within [`Bounds`], with `t` between `0.0` and `1.0` (both bounds
+/// are exclusive, as `t == 0.0` and `t == 1.0` cannot correspond to _crossing_ a boundary, only to
+/// _touching_ it). Once `t` is `1.0` or `x` and `y` have moved out of bounds, the iterator returns
+/// `None` for all future calls to `next`.
+///
+/// When the ray moves out of x-bounds while crossing a corner, only the x-boundary crossing will be
+/// produced. This behaviour follows from the already stated behaviour of the iterator, as the
+/// (immediately following) y-boundary crossing will already have an out-of-bounds x value.
 #[derive(Debug)]
 pub struct CombinedBoundaryTraversal {
     step_x: i32,
@@ -19,7 +37,7 @@ pub struct CombinedBoundaryTraversal {
 }
 
 impl CombinedBoundaryTraversal {
-    pub fn new(ray: Ray) -> Self {
+    pub fn new(ray: Ray, bounds: Bounds) -> Self {
         let step_x = ray.diff_x.signum() as i32;
         let step_y = ray.diff_y.signum() as i32;
 
@@ -57,25 +75,37 @@ impl CombinedBoundaryTraversal {
         // difference in t that corresponds to a difference in y of exactly 1.0
         let t_delta_y = ray.diff_y.recip().abs();
 
-        // absolute difference between start_x and the next x-boundary
+        // absolute difference between start_x and the next x-boundary within bounds
         let dist_x = if ray.diff_x >= 0.0 {
-            // If start_x is an integer, this is just 1.
-            // Otherwise, this is start_x.ceil() - start_x (the difference to the next-up integer).
-            ray.start_x.floor() - ray.start_x + 1.0
+            // if start_x is an integer, this is start_x + 1; else, it is ceil(start_x)
+            let next_up_x = ray.start_x.floor() + 1.0;
+            // the minimum x-boundary that can be crossed
+            let min_x_boundary = bounds.min_x as f32;
+            let first_x_boundary_crossable = next_up_x.max(min_x_boundary);
+            first_x_boundary_crossable - ray.start_x
         } else {
-            // If start_x is an integer, this is just 1.
-            // Otherwise, this is start_x - start_x.floor() (the difference to the next-down integer).
-            ray.start_x - ray.start_x.ceil() + 1.0
+            // if start_x is an integer, this is start_x - 1; else, it is floor(start_x)
+            let next_down_x = ray.start_x.ceil() - 1.0;
+            // the maximum x-boundary that can be crossed
+            let max_x_boundary = bounds.max_x as f32;
+            let first_x_boundary_crossable = next_down_x.min(max_x_boundary);
+            ray.start_x - first_x_boundary_crossable
         };
-        // absolute difference between start_y and the next y-boundary
+        // absolute difference between start_y and the next y-boundary within bounds
         let dist_y = if ray.diff_y >= 0.0 {
-            // If start_x is an integer, this is just 1.
-            // Otherwise, this is start_x.ceil() - start_x (the difference to the next-up integer).
-            ray.start_x.floor() - ray.start_x + 1.0
+            // if start_y is an integer, this is start_y + 1; else, it is ceil(start_y)
+            let next_up_y = ray.start_y.floor() + 1.0;
+            // the minimum y-boundary that can be crossed
+            let min_y_boundary = bounds.min_y as f32;
+            let first_y_boundary_crossable = next_up_y.max(min_y_boundary);
+            first_y_boundary_crossable - ray.start_y
         } else {
-            // If start_x is an integer, this is just 1.
-            // Otherwise, this is start_x - start_x.floor() (the difference to the next-down integer).
-            ray.start_x - ray.start_x.ceil() + 1.0
+            // if start_y is an integer, this is start_y - 1; else, it is floor(start_y)
+            let next_down_y = ray.start_y.ceil() - 1.0;
+            // the maximum y-boundary that can be crossed
+            let max_y_boundary = bounds.max_y as f32;
+            let first_y_boundary_crossable = next_down_y.min(max_y_boundary);
+            ray.start_y - first_y_boundary_crossable
         };
 
         // the value of t at which the next x-boundary is crossed
