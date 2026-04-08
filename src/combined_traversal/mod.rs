@@ -69,13 +69,13 @@ impl CombinedBoundaryTraversal {
         };
         // absolute difference between start_y and the next y-boundary
         let dist_y = if ray.diff_y >= 0.0 {
-            // If start_x is an integer, this is just 1.
-            // Otherwise, this is start_x.ceil() - start_x (the difference to the next-up integer).
-            ray.start_x.floor() - ray.start_x + 1.0
+            // If start_y is an integer, this is just 1.
+            // Otherwise, this is start_y.ceil() - start_y (the difference to the next-up integer).
+            ray.start_y.floor() - ray.start_y + 1.0
         } else {
-            // If start_x is an integer, this is just 1.
-            // Otherwise, this is start_x - start_x.floor() (the difference to the next-down integer).
-            ray.start_x - ray.start_x.ceil() + 1.0
+            // If start_y is an integer, this is just 1.
+            // Otherwise, this is start_y - start_y.floor() (the difference to the next-down integer).
+            ray.start_y - ray.start_y.ceil() + 1.0
         };
 
         // the value of t at which the next x-boundary is crossed
