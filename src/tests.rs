@@ -1,6 +1,8 @@
+use crate::combined_pixel_traversal::CombinedPixelTraversal;
 use crate::is_line_free;
 use crate::matrix::{ArrayMatrix, Matrix};
 use crate::ray_z::RayZ;
+use image::{DynamicImage, Rgb};
 use rand::distr::{Distribution, Uniform};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -58,7 +60,7 @@ fn single_obstacle() {
 
 #[test]
 fn random() {
-    let n_rays = 1_000_000;
+    let n_rays = 100;
     let x_size = 2000;
     let y_size = 2000;
     let z_size = 15;
@@ -87,6 +89,40 @@ fn random() {
         })
         .collect();
     let mut matrix = ArrayMatrix::<f32>::random(x_size, y_size, height_distribution, &mut rng);
+
+    // matrix.save_as_image(10.0, "out.png");
+
+    /*let mut image = DynamicImage::ImageLuma8(matrix.as_image(10.0)).into_rgb8();
+
+    for &ray_z in &rays {
+        let ray = ray_z.as_ray();
+        let mut still_free = true;
+        for segment in CombinedPixelTraversal::new(ray) {
+            let free = if ray_z.diff_z >= 0.0 {
+                matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
+                    < (ray_z.start_z + segment.start_t * ray_z.diff_z)
+            } else {
+                matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
+                    < ray_z.start_z + segment.end_t * ray_z.diff_z
+            };
+            still_free &= free;
+            if still_free {
+                image.put_pixel(
+                    segment.pixel_x as u32,
+                    segment.pixel_y as u32,
+                    Rgb([0, 255, 0]),
+                );
+            } else {
+                image.put_pixel(
+                    segment.pixel_x as u32,
+                    segment.pixel_y as u32,
+                    Rgb([255, 0, 0]),
+                );
+            }
+        }
+    }
+
+    image.save("out.png");*/
 
     let n_free = rays
         .iter()

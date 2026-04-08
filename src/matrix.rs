@@ -1,3 +1,4 @@
+use image::{ImageBuffer, Luma};
 use rand::distr::Distribution;
 use rand::Rng;
 
@@ -47,6 +48,23 @@ impl<T: Copy + Default> ArrayMatrix<T> {
             x_len,
             y_len,
         }
+    }
+}
+
+impl ArrayMatrix<f32> {
+    pub(crate) fn save_as_image(&self, white_value: f32, path: &str) {
+        self.as_image(white_value).save(path);
+    }
+
+    pub(crate) fn as_image(&self, white_value: f32) -> ImageBuffer<Luma<u8>, Vec<u8>> {
+        image::GrayImage::from_fn(self.x_len as u32, self.y_len as u32, |x, y| {
+            Luma(
+                [
+                    ((self.get(x as usize, y as usize) / white_value).clamp(0.0, 1.0) * 255.0)
+                        as u8,
+                ],
+            )
+        })
     }
 }
 
