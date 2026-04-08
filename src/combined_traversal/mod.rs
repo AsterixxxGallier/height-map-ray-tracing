@@ -122,6 +122,14 @@ impl CombinedBoundaryTraversal {
             n_iters,
         }
     }
+
+    pub fn pixel_x(&self) -> i32 {
+        self.pixel_x
+    }
+
+    pub fn pixel_y(&self) -> i32 {
+        self.pixel_y
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
