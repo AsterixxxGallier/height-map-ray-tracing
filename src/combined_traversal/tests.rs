@@ -3,6 +3,24 @@ use crate::combined_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
 use crate::ray::Ray;
 
 #[test]
+fn t_within_bounds() {
+    let ray = Ray {
+        start_x: 1.0,
+        start_y: 0.8,
+        diff_x: -0.5,
+        diff_y: 0.5,
+    };
+
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    traversal.for_each(|crossing| {
+        match crossing {
+            BoundaryCrossing::X { t, .. } => assert!(t <= 1.0, "{t}"),
+            BoundaryCrossing::Y { t, .. } => assert!(t <= 1.0, "{t}"),
+        }
+    });
+}
+
+#[test]
 fn only_x_increasing() {
     let ray = Ray {
         start_x: 0.0,

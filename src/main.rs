@@ -1,8 +1,8 @@
 #![allow(unused)]
 
 use crate::combined_pixel_traversal::CombinedPixelTraversal;
-use crate::matrix::{ArrayMatrix, Matrix};
-use crate::ray::Ray;
+use crate::matrix::Matrix;
+use crate::ray_z::RayZ;
 
 pub mod bounds;
 pub mod combined_pixel_traversal;
@@ -10,52 +10,26 @@ pub mod combined_traversal;
 pub mod in_bounds_combined_traversal;
 pub mod matrix;
 pub mod ray;
+pub mod ray_z;
 pub mod separate_traversal;
+#[cfg(test)]
+mod tests;
 
-pub fn is_line_free<M: Matrix<Item = f32>>(
-    matrix: &M,
-    start_x: f32,
-    start_y: f32,
-    start_z: f32,
-    end_x: f32,
-    end_y: f32,
-    end_z: f32,
-) -> bool {
-    let ray = Ray {
-        start_x,
-        start_y,
-        diff_x: end_x - start_x,
-        diff_y: end_y - start_y,
-    };
+pub fn is_line_free<M: Matrix<Item = f32>>(matrix: &M, ray_z: RayZ) -> bool {
+    let ray = ray_z.as_ray();
     let mut pixel_traversal = CombinedPixelTraversal::new(ray);
 
-    let diff_z = end_z - start_z;
-    if diff_z >= 0.0 {
-        !pixel_traversal.any(|segment| {
+    if ray_z.diff_z >= 0.0 {
+        pixel_traversal.all(|segment| {
             matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                >= start_z + segment.start_t * diff_z
+                < (ray_z.start_z + segment.start_t * ray_z.diff_z)
         })
     } else {
-        !pixel_traversal.any(|segment| {
+        pixel_traversal.all(|segment| {
             matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                >= start_z + segment.end_t * diff_z
+                < ray_z.start_z + segment.end_t * ray_z.diff_z
         })
     }
 }
 
-fn main() {
-    let mut matrix = ArrayMatrix::<f32>::new(3, 3);
-    matrix.set(1, 1, 1.0);
-
-    let free = is_line_free(&matrix, 0.0, 0.0, 0.5, 3.0, 3.0, 0.5);
-    assert_eq!(free, false);
-
-    let free = is_line_free(&matrix, 0.0, 0.0, 0.5, 3.0, 1.0, 0.5);
-    assert_eq!(free, true);
-
-    let free = is_line_free(&matrix, 0.0, 0.0, 0.5, 3.0, 2.0, 0.5);
-    assert_eq!(free, false);
-
-    let free = is_line_free(&matrix, 0.0, 1.5, 2.0, 3.0, 1.5, 0.0);
-    assert_eq!(free, false);
-}
+fn main() {}

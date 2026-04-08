@@ -1,3 +1,6 @@
+use rand::distr::Distribution;
+use rand::Rng;
+
 pub trait Matrix {
     type Item;
 
@@ -15,6 +18,7 @@ pub trait Matrix {
 }
 
 /// Stores items in a contiguous array on the heap.
+#[derive(Debug)]
 pub struct ArrayMatrix<T> {
     store: Box<[T]>,
     x_len: usize,
@@ -24,6 +28,20 @@ pub struct ArrayMatrix<T> {
 impl<T: Copy + Default> ArrayMatrix<T> {
     pub fn new(x_len: usize, y_len: usize) -> Self {
         let store = vec![T::default(); x_len * y_len].into_boxed_slice();
+        Self {
+            store,
+            x_len,
+            y_len,
+        }
+    }
+
+    pub fn random(
+        x_len: usize,
+        y_len: usize,
+        distribution: impl Distribution<T>,
+        rng: &mut impl Rng,
+    ) -> Self {
+        let store: Box<[T]> = distribution.sample_iter(rng).take(x_len * y_len).collect();
         Self {
             store,
             x_len,
