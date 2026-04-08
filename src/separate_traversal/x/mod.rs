@@ -20,8 +20,7 @@ impl XBoundaryTraversal {
         // how much y-movement happens when we move by one pixel in the x-direction
         let step_y = ray.diff_y / ray.diff_x;
         // how far along the ray we have to move for the x-component of the movement to equal 1.0
-        // TODO: should this be .recip().abs()? (see CombinedBoundaryTraversal; same for XBoun.Tr.)
-        let t_delta_x = ray.diff_x.recip();
+        let t_delta_x = ray.diff_x.recip().abs();
         let mut x = ray.start_x;
         let mut y = ray.start_y;
         let mut t = 0.0;
@@ -30,21 +29,21 @@ impl XBoundaryTraversal {
             return None;
         }
 
-        if x.fract() != 0.0 {
-            // find the first x-boundary that the ray crosses, and position x and y accordingly
-
-            let dist_x = if step_x > 0.0 {
-                x.ceil() - x
-            } else {
-                x - x.floor()
-            };
-
-            x += dist_x * step_x;
-            y += dist_x * step_y;
-            t += dist_x * t_delta_x;
+        // This is the x-distance to the first boundary crossing.
+        let dist_x = if step_x > 0.0 {
+            // If x is an integer, this is just 1.
+            // Otherwise, this is x.ceil() - x (the difference to the next-up integer).
+            x.floor() - x + 1.0
         } else {
-            // the ray starts at an x-boundary
-        }
+            // If x is an integer, this is just 1.
+            // Otherwise, this is x - x.floor() (the difference to the next-down integer).
+            x - x.ceil() + 1.0
+        };
+
+        // Move by dist_x along the ray.
+        x += dist_x * step_x;
+        y += dist_x * step_y;
+        t += dist_x * t_delta_x;
 
         Some(Self {
             step_x,

@@ -13,19 +13,19 @@ fn only_x_increasing() {
     let mut traversal = XBoundaryTraversal::new(ray).unwrap();
 
     assert_eq!(traversal.next(), Some(XBoundaryCrossing {
-        t: 0.0,
+        t: 1.0,
         last_x_index: 0,
         next_x_index: 1,
         y_index: 0,
     }));
     assert_eq!(traversal.next(), Some(XBoundaryCrossing {
-        t: 1.0,
+        t: 2.0,
         last_x_index: 1,
         next_x_index: 2,
         y_index: 0,
     }));
     assert_eq!(traversal.next(), Some(XBoundaryCrossing {
-        t: 2.0,
+        t: 3.0,
         last_x_index: 2,
         next_x_index: 3,
         y_index: 0,

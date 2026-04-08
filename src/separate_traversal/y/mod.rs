@@ -17,7 +17,7 @@ impl YBoundaryTraversal {
         // how much x-movement happens when we move by one pixel in the y-direction
         let step_x = ray.diff_x / ray.diff_y;
         // how far along the ray we have to move for the y-component of the movement to equal 1.0
-        let t_delta_y = ray.diff_y.recip();
+        let t_delta_y = ray.diff_y.recip().abs();
         let mut x = ray.start_x;
         let mut y = ray.start_y;
         let mut t = 0.0;
@@ -26,21 +26,21 @@ impl YBoundaryTraversal {
             return None;
         }
 
-        if y.fract() != 0.0 {
-            // find the first y-boundary that the ray crosses, and position x and y accordingly
-
-            let dist_y = if step_y > 0.0 {
-                y.ceil() - y
-            } else {
-                y - y.floor()
-            };
-
-            x += dist_y * step_x;
-            y += dist_y * step_y;
-            t += dist_y * t_delta_y;
+        // This is the y-distance to the first boundary crossing.
+        let dist_y = if step_y > 0.0 {
+            // If y is an integer, this is just 1.
+            // Otherwise, this is y.ceil() - y (the difference to the next-up integer).
+            y.floor() - y + 1.0
         } else {
-            // the ray starts at an y-boundary
-        }
+            // If y is an integer, this is just 1.
+            // Otherwise, this is y - y.floor() (the difference to the next-down integer).
+            y - y.ceil() + 1.0
+        };
+
+        // Move by dist_y along the ray.
+        x += dist_y * step_x;
+        y += dist_y * step_y;
+        t += dist_y * t_delta_y;
 
         Some(Self {
             step_x,
