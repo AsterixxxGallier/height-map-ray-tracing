@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use crate::bounds::Bounds;
 use crate::ray::Ray;
 
@@ -32,7 +33,7 @@ pub struct CombinedBoundaryTraversal {
     t_delta_y: f32,
     t_max_x: f32,
     t_max_y: f32,
-    bounds: Bounds,
+    n_iters: usize,
 }
 
 impl CombinedBoundaryTraversal {
@@ -122,6 +123,23 @@ impl CombinedBoundaryTraversal {
             f32::INFINITY
         };
 
+        let x_crossings = if ray.diff_x > 0.0 {
+            // number of integers between ray.start_x and ray.end_x()
+            (ray.end_x().ceil() - ray.start_x.floor()) as usize - 1
+        } else if ray.diff_x < 0.0 {
+            (ray.start_x.ceil() - ray.end_x().floor()) as usize - 1
+        } else {
+            0
+        };
+        let y_crossings = if ray.diff_y > 0.0 {
+            (ray.end_y().ceil() - ray.start_y.floor()) as usize - 1
+        } else if ray.diff_y < 0.0 {
+            (ray.start_y.ceil() - ray.end_y().floor()) as usize - 1
+        } else {
+            0
+        };
+        let n_iters = x_crossings + y_crossings;
+
         Self {
             step_x,
             step_y,
@@ -131,7 +149,7 @@ impl CombinedBoundaryTraversal {
             t_delta_y,
             t_max_x,
             t_max_y,
-            bounds,
+            n_iters,
         }
     }
 }
@@ -156,24 +174,13 @@ impl Iterator for CombinedBoundaryTraversal {
     type Item = BoundaryCrossing;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.step_x == 1 && self.pixel_x >= self.bounds.max_x {
+        if self.n_iters == 0 {
             return None;
         }
-        if self.step_x == -1 && self.pixel_x < self.bounds.min_x {
-            return None;
-        }
-        if self.step_y == 1 && self.pixel_y >= self.bounds.max_y {
-            return None;
-        }
-        if self.step_y == -1 && self.pixel_y < self.bounds.min_y {
-            return None;
-        }
+
+        self.n_iters -= 1;
 
         let t = self.t_max_x.min(self.t_max_y);
-
-        if t == 1.0 {
-            return None;
-        }
 
         if self.t_max_x <= self.t_max_y {
             // we cross over the next x-boundary first
