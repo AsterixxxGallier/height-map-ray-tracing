@@ -1,17 +1,18 @@
+use num_traits::Float;
 use crate::ray::Ray;
 
-pub struct YBoundaryTraversal {
-    step_x: f32,
-    step_y: f32,
-    t_delta_y: f32,
-    x: f32,
-    y: f32,
-    t: f32,
+pub struct YBoundaryTraversal<T> {
+    step_x: T,
+    step_y: T,
+    t_delta_y: T,
+    x: T,
+    y: T,
+    t: T,
 }
 
-impl YBoundaryTraversal {
+impl<T: Float> YBoundaryTraversal<T> {
     /// Returns a new instance if `ray.diff_y != 0`.
-    pub fn new(ray: Ray) -> Option<Self> {
+    pub fn new(ray: Ray<T>) -> Option<Self> {
         // whether the ray moves y-increasing or y-decreasing
         let step_y = ray.diff_y.signum();
         // how much x-movement happens when we move by one pixel in the y-direction
@@ -20,27 +21,27 @@ impl YBoundaryTraversal {
         let t_delta_y = ray.diff_y.recip().abs();
         let mut x = ray.start_x;
         let mut y = ray.start_y;
-        let mut t = 0.0;
+        let mut t = T::zero();
 
-        if step_y == 0.0 {
+        if step_y == T::zero() {
             return None;
         }
 
         // This is the y-distance to the first boundary crossing.
-        let dist_y = if step_y > 0.0 {
+        let dist_y = if step_y > T::zero() {
             // If y is an integer, this is just 1.
             // Otherwise, this is y.ceil() - y (the difference to the next-up integer).
-            y.floor() - y + 1.0
+            y.floor() - y + T::one()
         } else {
             // If y is an integer, this is just 1.
             // Otherwise, this is y - y.floor() (the difference to the next-down integer).
-            y - y.ceil() + 1.0
+            y - y.ceil() + T::one()
         };
 
         // Move by dist_y along the ray.
-        x += dist_y * step_x;
-        y += dist_y * step_y;
-        t += dist_y * t_delta_y;
+        x = x + dist_y * step_x;
+        y = y + dist_y * step_y;
+        t = t + dist_y * t_delta_y;
 
         Some(Self {
             step_x,
@@ -54,27 +55,27 @@ impl YBoundaryTraversal {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct YBoundaryCrossing {
-    t: f32,
-    x_index: isize,
-    last_y_index: isize,
-    next_y_index: isize,
+pub struct YBoundaryCrossing<T> {
+    t: T,
+    x_index: i32,
+    last_y_index: i32,
+    next_y_index: i32,
 }
 
-impl Iterator for YBoundaryTraversal {
-    type Item = YBoundaryCrossing;
+impl<T: Float> Iterator for YBoundaryTraversal<T> {
+    type Item = YBoundaryCrossing<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let item = YBoundaryCrossing {
             t: self.t,
-            x_index: self.x as isize,
-            last_y_index: (self.y - self.step_y) as isize,
-            next_y_index: self.y as isize,
+            x_index: self.x.to_i32().unwrap(),
+            last_y_index: (self.y - self.step_y).to_i32().unwrap(),
+            next_y_index: self.y.to_i32().unwrap(),
         };
 
-        self.x += self.step_x;
-        self.y += self.step_y;
-        self.t += self.t_delta_y;
+        self.x = self.x + self.step_x;
+        self.y = self.y + self.step_y;
+        self.t = self.t + self.t_delta_y;
 
         Some(item)
     }

@@ -1,20 +1,21 @@
+use num_traits::Float;
 use crate::ray::Ray;
 use crate::thin_combined_traversal::{BoundaryCrossing, ThinCombinedBoundaryTraversal};
 
 #[cfg(test)]
 mod tests;
 
-pub struct CombinedPixelTraversal {
-    boundary_traversal: ThinCombinedBoundaryTraversal,
-    last_t: f64,
+pub struct CombinedPixelTraversal<T> {
+    boundary_traversal: ThinCombinedBoundaryTraversal<T>,
+    last_t: T,
     current: Option<(i32, i32)>,
 }
 
-impl CombinedPixelTraversal {
-    pub fn new(ray: Ray) -> Self {
+impl<T: Float> CombinedPixelTraversal<T> {
+    pub fn new(ray: Ray<T>) -> Self {
         let boundary_traversal = ThinCombinedBoundaryTraversal::new(ray);
         Self {
-            last_t: 0.0,
+            last_t: T::zero(),
             current: Some((boundary_traversal.pixel_x(), boundary_traversal.pixel_y())),
             boundary_traversal,
         }
@@ -22,15 +23,15 @@ impl CombinedPixelTraversal {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct PixelSegment {
+pub struct PixelSegment<T> {
     pub pixel_x: i32,
     pub pixel_y: i32,
-    pub start_t: f64,
-    pub end_t: f64,
+    pub start_t: T,
+    pub end_t: T,
 }
 
-impl Iterator for CombinedPixelTraversal {
-    type Item = PixelSegment;
+impl<T: Float> Iterator for CombinedPixelTraversal<T> {
+    type Item = PixelSegment<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (pixel_x, pixel_y) = self.current?;
@@ -71,7 +72,7 @@ impl Iterator for CombinedPixelTraversal {
                 pixel_x,
                 pixel_y,
                 start_t: self.last_t,
-                end_t: 1.0,
+                end_t: T::one(),
             })
         }
     }

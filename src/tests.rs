@@ -1,13 +1,16 @@
-use crate::{is_line_free, max_z};
 use crate::matrix::{ArrayMatrix, Matrix};
+use crate::ray::Ray;
 use crate::ray_z::RayZ;
+use crate::{is_line_free, max_z};
 use image::{Rgb, RgbImage};
 use rand::distr::Uniform;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rand_distr::Exp1;
-use std::f32::consts::PI;
-use crate::ray::Ray;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
+use std::f64::consts::PI;
+use std::time::Instant;
 
 #[test]
 fn single_obstacle() {
@@ -65,44 +68,63 @@ fn random() {
     let x_size = 2048;
     let y_size = 2048;
     let z_size = 15;
-    let x_distribution = Uniform::new(0.0, x_size as f32).unwrap();
-    let y_distribution = Uniform::new(0.0, y_size as f32).unwrap();
+    let x_distribution = Uniform::new(0.0, x_size as f64).unwrap();
+    let y_distribution = Uniform::new(0.0, y_size as f64).unwrap();
     let z_distribution = Uniform::new(0.0, z_size as f32).unwrap();
     let height_distribution = Exp1;
 
     let mut rng = SmallRng::seed_from_u64(0);
     let mut matrix = ArrayMatrix::<f32>::random(x_size, y_size, height_distribution, &mut rng);
 
+    let start = Instant::now();
     let start_y_resolution = 1;
-    let angle_resolution = 1;
-    let mut image = RgbImage::new((y_size * start_y_resolution) as u32, (y_size * angle_resolution) as u32 - 1);
+    let angle_resolution = 4;
+    let mut image = RgbImage::new(
+        (y_size * start_y_resolution) as u32,
+        (y_size * angle_resolution) as u32 - 1,
+    );
     for start_y_index in 0..y_size * start_y_resolution {
-        println!("{start_y_index}");
-        let start_y = start_y_index as f32 / start_y_resolution as f32 + 0.5;
-        for angle_index in 1..y_size * angle_resolution {
-            let angle = (angle_index as f32 / angle_resolution as f32 / y_size as f32 - 0.5) * PI;
-            let slope = angle.tan();
-            let mut ray = Ray {
-                start_x: 0.0,
-                start_y,
-                diff_x: x_size as f32,
-                diff_y: y_size as f32 * slope,
-            };
-            if ray.end_y() < 0.0 {
-                let dist_y = start_y;
-                ray.diff_x = (-dist_y / slope).clamp(0.0, y_size as f32);
-                ray.diff_y = -dist_y;
-            } else if ray.end_y() > y_size as f32 {
-                let dist_y = y_size as f32 - start_y;
-                ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f32);
-                ray.diff_y = dist_y;
-            }
-            let mut max_z = max_z(&matrix, ray).unwrap();
-            let value = (max_z / 15.0 * 255.0) as u8;
+        println!("{}/{}", start_y_index + 1, y_size * start_y_resolution);
+        let start_y = (start_y_index as f64 + 0.5) / start_y_resolution as f64;
+        let values: Vec<u8> = (1..y_size * angle_resolution)
+            .into_par_iter()
+            .map(|angle_index| {
+                let angle =
+                    (angle_index as f64 / angle_resolution as f64 / y_size as f64 - 0.5) * PI;
+                let slope = angle.tan();
+                let mut ray = Ray {
+                    start_x: 0.0,
+                    start_y,
+                    diff_x: x_size as f64,
+                    diff_y: y_size as f64 * slope,
+                };
+                if ray.end_y() < 0.0 {
+                    let dist_y = start_y;
+                    ray.diff_x = (-dist_y / slope).clamp(0.0, y_size as f64);
+                    ray.diff_y = -dist_y;
+                } else if ray.end_y() > y_size as f64 {
+                    let dist_y = y_size as f64 - start_y;
+                    ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f64);
+                    ray.diff_y = dist_y;
+                }
+                let mut max_z = max_z(&matrix, ray).unwrap();
+                (max_z / 15.0 * 255.0) as u8
+            })
+            .collect();
+        for (index, value) in values.into_iter().enumerate() {
             let value = Rgb([value, value, value]);
-            image.put_pixel(start_y_index as u32, angle_index as u32, value);
+            image.put_pixel(start_y_index as u32, index as u32, value);
         }
     }
+    let elapsed = start.elapsed();
+    let num_rays = image.width() * image.height();
+    println!(
+        "{} rays computed in {:?} ({:?} per ray, {} million rays per second)",
+        num_rays,
+        elapsed,
+        elapsed / num_rays,
+        (num_rays as f64 / elapsed.as_secs_f64() / 1e6) as u32,
+    );
     image.save("out.png");
 
     // let rays: Vec<_> = (0..n_rays)

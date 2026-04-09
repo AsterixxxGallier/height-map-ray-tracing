@@ -422,8 +422,10 @@ name = "height-map-ray-tracing"
 version = "0.1.0"
 dependencies = [
  "image",
+ "num-traits",
  "rand 0.10.0",
  "rand_distr",
+ "rayon",
 ]
 
 [[package]]
