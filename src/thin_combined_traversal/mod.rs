@@ -11,10 +11,10 @@ pub struct ThinCombinedBoundaryTraversal {
     step_y: i32,
     pixel_x: i32,
     pixel_y: i32,
-    t_delta_x: f32,
-    t_delta_y: f32,
-    t_max_x: f32,
-    t_max_y: f32,
+    t_delta_x: f64,
+    t_delta_y: f64,
+    t_max_x: f64,
+    t_max_y: f64,
 }
 
 impl ThinCombinedBoundaryTraversal {
@@ -52,9 +52,9 @@ impl ThinCombinedBoundaryTraversal {
         };
 
         // difference in t that corresponds to a difference in x of exactly 1.0
-        let t_delta_x = ray.diff_x.recip().abs();
+        let t_delta_x = ray.diff_x.recip().abs() as f64;
         // difference in t that corresponds to a difference in y of exactly 1.0
-        let t_delta_y = ray.diff_y.recip().abs();
+        let t_delta_y = ray.diff_y.recip().abs() as f64;
 
         // absolute difference between start_x and the next x-boundary
         let dist_x = if ray.diff_x >= 0.0 {
@@ -65,7 +65,7 @@ impl ThinCombinedBoundaryTraversal {
             // If start_x is an integer, this is just 1.
             // Otherwise, this is start_x - start_x.floor() (the difference to the next-down integer).
             ray.start_x - ray.start_x.ceil() + 1.0
-        };
+        } as f64;
         // absolute difference between start_y and the next y-boundary
         let dist_y = if ray.diff_y >= 0.0 {
             // If start_y is an integer, this is just 1.
@@ -75,21 +75,21 @@ impl ThinCombinedBoundaryTraversal {
             // If start_y is an integer, this is just 1.
             // Otherwise, this is start_y - start_y.floor() (the difference to the next-down integer).
             ray.start_y - ray.start_y.ceil() + 1.0
-        };
+        } as f64;
 
         // the value of t at which the next x-boundary is crossed
         // = the value of t at which x is maximal before crossing over the next x-boundary
         let t_max_x = if t_delta_x.is_finite() {
             t_delta_x * dist_x
         } else {
-            f32::INFINITY
+            f64::INFINITY
         };
         // the value of t at which the next y-boundary is crossed
         // = the value of t at which y is maximal before crossing over the next y-boundary
         let t_max_y = if t_delta_y.is_finite() {
             t_delta_y * dist_y
         } else {
-            f32::INFINITY
+            f64::INFINITY
         };
 
         Self {
@@ -116,19 +116,19 @@ impl ThinCombinedBoundaryTraversal {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BoundaryCrossing {
     X {
-        t: f32,
+        t: f64,
         last_x_index: i32,
         next_x_index: i32,
         y_index: i32,
     },
     Y {
-        t: f32,
+        t: f64,
         x_index: i32,
         last_y_index: i32,
         next_y_index: i32,
     },
     XY {
-        t: f32,
+        t: f64,
         last_x_index: i32,
         next_x_index: i32,
         last_y_index: i32,
@@ -142,7 +142,7 @@ impl Iterator for ThinCombinedBoundaryTraversal {
     fn next(&mut self) -> Option<Self::Item> {
         let t = self.t_max_x.min(self.t_max_y);
 
-        if t >= 1.0 {
+        if t >= 0.999999 {
             return None;
         }
 

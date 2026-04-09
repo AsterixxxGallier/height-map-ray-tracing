@@ -1,4 +1,4 @@
-use crate::is_line_free;
+use crate::{is_line_free, max_z};
 use crate::matrix::{ArrayMatrix, Matrix};
 use crate::ray_z::RayZ;
 use image::{Rgb, RgbImage};
@@ -60,7 +60,6 @@ fn single_obstacle() {
 }
 
 #[test]
-#[ignore]
 fn random() {
     let n_rays = 100;
     let x_size = 2048;
@@ -99,22 +98,13 @@ fn random() {
                 ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f32);
                 ray.diff_y = dist_y;
             }
-            let mut max_z = 0.0;
-            for z_index in 0..=15 * z_resolution {
-                let z = z_index as f32 / z_resolution as f32;
-                let ray = RayZ {
-                    start_x: ray.start_x,
-                    start_y: ray.start_y,
-                    start_z: z,
-                    diff_x: ray.diff_x,
-                    diff_y: ray.diff_y,
-                    diff_z: 0.0,
-                };
-                if is_line_free(&matrix, ray) {
-                    max_z = z;
-                    break;
-                }
-            }
+            let ray = Ray {
+                start_x: ray.start_x,
+                start_y: ray.start_y,
+                diff_x: ray.diff_x,
+                diff_y: ray.diff_y,
+            };
+            let mut max_z = max_z(&matrix, ray).unwrap();
             let value = (max_z / 15.0 * 255.0) as u8;
             let value = Rgb([value, value, value]);
             image.put_pixel(start_y_index as u32, angle_index as u32, value);

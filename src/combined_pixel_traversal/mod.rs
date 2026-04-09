@@ -6,7 +6,7 @@ mod tests;
 
 pub struct CombinedPixelTraversal {
     boundary_traversal: ThinCombinedBoundaryTraversal,
-    last_t: f32,
+    last_t: f64,
     current: Option<(i32, i32)>,
 }
 
@@ -25,8 +25,8 @@ impl CombinedPixelTraversal {
 pub struct PixelSegment {
     pub pixel_x: i32,
     pub pixel_y: i32,
-    pub start_t: f32,
-    pub end_t: f32,
+    pub start_t: f64,
+    pub end_t: f64,
 }
 
 impl Iterator for CombinedPixelTraversal {

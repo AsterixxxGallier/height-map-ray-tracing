@@ -126,11 +126,11 @@ impl<T: Copy + Default> Matrix for ArrayMatrix<T> {
     }
 
     fn get(&self, x_index: usize, y_index: usize) -> T {
-        // debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
-        // debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
-        if x_index >= self.x_len || y_index >= self.y_len {
-            return T::default();
-        }
+        debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
+        debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
+        // if x_index >= self.x_len || y_index >= self.y_len {
+        //     return T::default();
+        // }
         self.store[y_index * self.x_len + x_index]
     }
 
