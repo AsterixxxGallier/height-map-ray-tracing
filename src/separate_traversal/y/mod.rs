@@ -1,5 +1,6 @@
-use num_traits::Float;
 use crate::ray::Ray;
+use num_traits::Float;
+use std::fmt::Debug;
 
 pub struct YBoundaryTraversal<T> {
     step_x: T,
@@ -56,21 +57,27 @@ impl<T: Float> YBoundaryTraversal<T> {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct YBoundaryCrossing<T> {
-    t: T,
-    x_index: i32,
-    last_y_index: i32,
-    next_y_index: i32,
+    pub t: T,
+    pub x_index: i32,
+    pub last_y_index: i32,
+    pub next_y_index: i32,
 }
 
 impl<T: Float> Iterator for YBoundaryTraversal<T> {
     type Item = YBoundaryCrossing<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let item = YBoundaryCrossing {
-            t: self.t,
-            x_index: self.x.to_i32().unwrap(),
-            last_y_index: (self.y - self.step_y).to_i32().unwrap(),
-            next_y_index: self.y.to_i32().unwrap(),
+        if self.t >= T::from(0.999999f32).unwrap() {
+            return None;
+        }
+
+        let item = unsafe {
+            YBoundaryCrossing {
+                t: self.t,
+                x_index: self.x.to_i32().unwrap_unchecked(),
+                last_y_index: (self.y - self.step_y).to_i32().unwrap_unchecked(),
+                next_y_index: self.y.to_i32().unwrap_unchecked(),
+            }
         };
 
         self.x = self.x + self.step_x;

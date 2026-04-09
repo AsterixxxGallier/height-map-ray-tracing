@@ -78,7 +78,7 @@ fn random() {
 
     let start = Instant::now();
     let start_y_resolution = 1;
-    let angle_resolution = 4;
+    let angle_resolution = 1;
     let mut image = RgbImage::new(
         (y_size * start_y_resolution) as u32,
         (y_size * angle_resolution) as u32 - 1,
@@ -87,7 +87,7 @@ fn random() {
         println!("{}/{}", start_y_index + 1, y_size * start_y_resolution);
         let start_y = (start_y_index as f64 + 0.5) / start_y_resolution as f64;
         let values: Vec<u8> = (1..y_size * angle_resolution)
-            .into_par_iter()
+            // .into_par_iter()
             .map(|angle_index| {
                 let angle =
                     (angle_index as f64 / angle_resolution as f64 / y_size as f64 - 0.5) * PI;
@@ -119,11 +119,11 @@ fn random() {
     let elapsed = start.elapsed();
     let num_rays = image.width() * image.height();
     println!(
-        "{} rays computed in {:?} ({:?} per ray, {} million rays per second)",
+        "{} rays computed in {:?} ({:.2} fs per ray pixel, {:.2} trillion ray pixels per second)",
         num_rays,
         elapsed,
-        elapsed / num_rays,
-        (num_rays as f64 / elapsed.as_secs_f64() / 1e6) as u32,
+        elapsed.as_nanos() as f64 / (num_rays as usize * matrix.len()) as f64 * 1e6,
+        (num_rays as f64 * matrix.len() as f64 / elapsed.as_secs_f64() / 1e12),
     );
     image.save("out.png");
 

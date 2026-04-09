@@ -1,9 +1,11 @@
-use num_traits::Float;
 use crate::ray::Ray;
+use num_traits::Float;
+use std::fmt::Debug;
 
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug)]
 pub struct XBoundaryTraversal<T> {
     step_x: T,
     step_y: T,
@@ -59,21 +61,27 @@ impl<T: Float> XBoundaryTraversal<T> {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct XBoundaryCrossing<T> {
-    t: T,
-    last_x_index: i32,
-    next_x_index: i32,
-    y_index: i32,
+    pub t: T,
+    pub last_x_index: i32,
+    pub next_x_index: i32,
+    pub y_index: i32,
 }
 
 impl<T: Float> Iterator for XBoundaryTraversal<T> {
     type Item = XBoundaryCrossing<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let item = XBoundaryCrossing {
-            t: self.t,
-            last_x_index: (self.x - self.step_x).to_i32().unwrap(),
-            next_x_index: self.x.to_i32().unwrap(),
-            y_index: self.y.to_i32().unwrap(),
+        if self.t >= T::from(0.999999f32).unwrap() {
+            return None;
+        }
+
+        let item = unsafe {
+            XBoundaryCrossing {
+                t: self.t,
+                last_x_index: (self.x - self.step_x).to_i32().unwrap_unchecked(),
+                next_x_index: self.x.to_i32().unwrap_unchecked(),
+                y_index: self.y.to_i32().unwrap_unchecked(),
+            }
         };
 
         self.x = self.x + self.step_x;
