@@ -73,15 +73,14 @@ fn random() {
     let mut rng = SmallRng::seed_from_u64(0);
     let mut matrix = ArrayMatrix::<f32>::random(x_size, y_size, height_distribution, &mut rng);
 
-    let start_y_resolution = 2;
-    let angle_resolution = 2;
-    let z_resolution = 2;
-    let mut image = RgbImage::new((y_size * start_y_resolution) as u32 + 1, (y_size * angle_resolution) as u32 + 1);
-    for start_y_index in 0..=y_size * start_y_resolution {
+    let start_y_resolution = 1;
+    let angle_resolution = 1;
+    let mut image = RgbImage::new((y_size * start_y_resolution) as u32, (y_size * angle_resolution) as u32 - 1);
+    for start_y_index in 0..y_size * start_y_resolution {
         println!("{start_y_index}");
-        let start_y = start_y_index as f32 / start_y_resolution as f32;
-        for angle_index in 0..=y_size * angle_resolution {
-            let angle = (angle_index as f32 / angle_resolution as f32 / (y_size as f32 + 1.0) - 0.5) * PI;
+        let start_y = start_y_index as f32 / start_y_resolution as f32 + 0.5;
+        for angle_index in 1..y_size * angle_resolution {
+            let angle = (angle_index as f32 / angle_resolution as f32 / y_size as f32 - 0.5) * PI;
             let slope = angle.tan();
             let mut ray = Ray {
                 start_x: 0.0,
@@ -98,12 +97,6 @@ fn random() {
                 ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f32);
                 ray.diff_y = dist_y;
             }
-            let ray = Ray {
-                start_x: ray.start_x,
-                start_y: ray.start_y,
-                diff_x: ray.diff_x,
-                diff_y: ray.diff_y,
-            };
             let mut max_z = max_z(&matrix, ray).unwrap();
             let value = (max_z / 15.0 * 255.0) as u8;
             let value = Rgb([value, value, value]);

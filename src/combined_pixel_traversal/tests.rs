@@ -6,15 +6,15 @@ use crate::thin_combined_traversal::ThinCombinedBoundaryTraversal;
 fn edge_case() {
     let ray = Ray {
         start_x: 0.0,
-        start_y: 40.0,
-        diff_x: 40.0007,
-        diff_y: -40.0,
+        start_y: 2048.0,
+        diff_x: 2048.0,
+        diff_y: 46852776000.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
-    traversal.for_each(|crossing| {
-        dbg!(crossing);
-    });
+    // let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    // traversal.for_each(|crossing| {
+    //     dbg!(crossing);
+    // });
 
     let mut traversal = CombinedPixelTraversal::new(ray);
     traversal.for_each(|segment| {
