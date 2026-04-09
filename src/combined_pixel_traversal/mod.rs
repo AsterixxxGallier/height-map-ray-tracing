@@ -1,15 +1,18 @@
-use crate::combined_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
 use crate::ray::Ray;
+use crate::thin_combined_traversal::{BoundaryCrossing, ThinCombinedBoundaryTraversal};
+
+#[cfg(test)]
+mod tests;
 
 pub struct CombinedPixelTraversal {
-    boundary_traversal: CombinedBoundaryTraversal,
+    boundary_traversal: ThinCombinedBoundaryTraversal,
     last_t: f32,
     current: Option<(i32, i32)>,
 }
 
 impl CombinedPixelTraversal {
     pub fn new(ray: Ray) -> Self {
-        let boundary_traversal = CombinedBoundaryTraversal::new(ray);
+        let boundary_traversal = ThinCombinedBoundaryTraversal::new(ray);
         Self {
             last_t: 0.0,
             current: Some((boundary_traversal.pixel_x(), boundary_traversal.pixel_y())),
@@ -45,6 +48,13 @@ impl Iterator for CombinedPixelTraversal {
                     last_y_index: _,
                     next_y_index,
                 } => (t, x_index, next_y_index),
+                BoundaryCrossing::XY {
+                    t,
+                    last_x_index: _,
+                    next_x_index,
+                    last_y_index: _,
+                    next_y_index,
+                } => (t, next_x_index, next_y_index),
             };
             self.current = Some((new_x, new_y));
             let start_t = self.last_t;

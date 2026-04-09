@@ -1,12 +1,13 @@
-use crate::combined_pixel_traversal::CombinedPixelTraversal;
 use crate::is_line_free;
 use crate::matrix::{ArrayMatrix, Matrix};
 use crate::ray_z::RayZ;
-use image::{DynamicImage, Rgb};
-use rand::distr::{Distribution, Uniform};
+use image::{Rgb, RgbImage};
+use rand::distr::Uniform;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rand_distr::Exp1;
+use std::f32::consts::PI;
+use crate::ray::Ray;
 
 #[test]
 fn single_obstacle() {
@@ -59,10 +60,11 @@ fn single_obstacle() {
 }
 
 #[test]
+#[ignore]
 fn random() {
     let n_rays = 100;
-    let x_size = 2000;
-    let y_size = 2000;
+    let x_size = 2048;
+    let y_size = 2048;
     let z_size = 15;
     let x_distribution = Uniform::new(0.0, x_size as f32).unwrap();
     let y_distribution = Uniform::new(0.0, y_size as f32).unwrap();
@@ -70,27 +72,76 @@ fn random() {
     let height_distribution = Exp1;
 
     let mut rng = SmallRng::seed_from_u64(0);
-    let rays: Vec<_> = (0..n_rays)
-        .map(|_| {
-            let start_x = x_distribution.sample(&mut rng);
-            let start_y = y_distribution.sample(&mut rng);
-            let start_z = z_distribution.sample(&mut rng);
-            let end_x = x_distribution.sample(&mut rng);
-            let end_y = y_distribution.sample(&mut rng);
-            let end_z = z_distribution.sample(&mut rng);
-            RayZ {
-                start_x,
-                start_y,
-                start_z,
-                diff_x: end_x - start_x,
-                diff_y: end_y - start_y,
-                diff_z: end_z - start_z,
-            }
-        })
-        .collect();
     let mut matrix = ArrayMatrix::<f32>::random(x_size, y_size, height_distribution, &mut rng);
 
-    // matrix.save_as_image(10.0, "out.png");
+    let start_y_resolution = 2;
+    let angle_resolution = 2;
+    let z_resolution = 2;
+    let mut image = RgbImage::new((y_size * start_y_resolution) as u32 + 1, (y_size * angle_resolution) as u32 + 1);
+    for start_y_index in 0..=y_size * start_y_resolution {
+        println!("{start_y_index}");
+        let start_y = start_y_index as f32 / start_y_resolution as f32;
+        for angle_index in 0..=y_size * angle_resolution {
+            let angle = (angle_index as f32 / angle_resolution as f32 / (y_size as f32 + 1.0) - 0.5) * PI;
+            let slope = angle.tan();
+            let mut ray = Ray {
+                start_x: 0.0,
+                start_y,
+                diff_x: x_size as f32,
+                diff_y: y_size as f32 * slope,
+            };
+            if ray.end_y() < 0.0 {
+                let dist_y = start_y;
+                ray.diff_x = (-dist_y / slope).clamp(0.0, y_size as f32);
+                ray.diff_y = -dist_y;
+            } else if ray.end_y() > y_size as f32 {
+                let dist_y = y_size as f32 - start_y;
+                ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f32);
+                ray.diff_y = dist_y;
+            }
+            let mut max_z = 0.0;
+            for z_index in 0..=15 * z_resolution {
+                let z = z_index as f32 / z_resolution as f32;
+                let ray = RayZ {
+                    start_x: ray.start_x,
+                    start_y: ray.start_y,
+                    start_z: z,
+                    diff_x: ray.diff_x,
+                    diff_y: ray.diff_y,
+                    diff_z: 0.0,
+                };
+                if is_line_free(&matrix, ray) {
+                    max_z = z;
+                    break;
+                }
+            }
+            let value = (max_z / 15.0 * 255.0) as u8;
+            let value = Rgb([value, value, value]);
+            image.put_pixel(start_y_index as u32, angle_index as u32, value);
+        }
+    }
+    image.save("out.png");
+
+    // let rays: Vec<_> = (0..n_rays)
+    //     .map(|_| {
+    //         let start_x = x_distribution.sample(&mut rng);
+    //         let start_y = y_distribution.sample(&mut rng);
+    //         let start_z = z_distribution.sample(&mut rng);
+    //         let end_x = x_distribution.sample(&mut rng);
+    //         let end_y = y_distribution.sample(&mut rng);
+    //         let end_z = z_distribution.sample(&mut rng);
+    //         RayZ {
+    //             start_x,
+    //             start_y,
+    //             start_z,
+    //             diff_x: end_x - start_x,
+    //             diff_y: end_y - start_y,
+    //             diff_z: end_z - start_z,
+    //         }
+    //     })
+    //     .collect();
+
+    // matrix.max_reduce().max_reduce().max_reduce().max_reduce().save_as_image(7.5, "out.png");
 
     /*let mut image = DynamicImage::ImageLuma8(matrix.as_image(10.0)).into_rgb8();
 
@@ -124,9 +175,9 @@ fn random() {
 
     image.save("out.png");*/
 
-    let n_free = rays
-        .iter()
-        .filter(|&&ray| is_line_free(&matrix, ray))
-        .count();
-    println!("n_free = {n_free}");
+    // let n_free = rays
+    //     .iter()
+    //     .filter(|&&ray| is_line_free(&matrix, ray))
+    //     .count();
+    // println!("n_free = {n_free}");
 }

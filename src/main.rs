@@ -7,6 +7,7 @@ use crate::ray_z::RayZ;
 pub mod bounds;
 pub mod combined_pixel_traversal;
 pub mod combined_traversal;
+pub mod thin_combined_traversal;
 pub mod in_bounds_combined_traversal;
 pub mod matrix;
 pub mod ray;

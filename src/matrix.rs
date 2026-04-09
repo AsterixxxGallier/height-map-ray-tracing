@@ -1,6 +1,25 @@
-use image::{ImageBuffer, Luma};
+use image::{ImageBuffer, Rgb};
 use rand::distr::Distribution;
 use rand::Rng;
+
+pub struct MaxReducedMatrices(Vec<ArrayMatrix<f32>>);
+
+impl MaxReducedMatrices {
+    pub fn new(matrix: ArrayMatrix<f32>) -> Self {
+        assert!(matrix.x_len().is_power_of_two());
+        assert!(matrix.y_len().is_power_of_two());
+        assert_eq!(matrix.x_len(), matrix.y_len());
+        let mut vec = vec![matrix];
+        while vec.last().unwrap().x_len() > 1 {
+            vec.push(vec.first().unwrap().max_reduce());
+        }
+        Self(vec)
+    }
+
+    pub fn get(&self, reduction_level: usize) -> &ArrayMatrix<f32> {
+        &self.0[reduction_level]
+    }
+}
 
 pub trait Matrix {
     type Item;
@@ -52,23 +71,46 @@ impl<T: Copy + Default> ArrayMatrix<T> {
 }
 
 impl ArrayMatrix<f32> {
-    pub(crate) fn save_as_image(&self, white_value: f32, path: &str) {
+    pub fn max_reduce(&self) -> Self {
+        assert!(self.x_len.is_multiple_of(2));
+        assert!(self.y_len.is_multiple_of(2));
+        let mut new = Self::new(self.x_len / 2, self.y_len / 2);
+        for x in 0..new.x_len {
+            for y in 0..new.y_len {
+                let all = [
+                    self.get(x * 2, y * 2),
+                    self.get(x * 2 + 1, y * 2),
+                    self.get(x * 2, y * 2 + 1),
+                    self.get(x * 2 + 1, y * 2 + 1),
+                ];
+                let max = all.into_iter().reduce(f32::max).unwrap();
+                new.set(x, y, max);
+            }
+        }
+        new
+    }
+}
+
+impl ArrayMatrix<f32> {
+    pub fn save_as_image(&self, white_value: f32, path: &str) {
         self.as_image(white_value).save(path);
     }
 
-    pub(crate) fn as_image(&self, white_value: f32) -> ImageBuffer<Luma<u8>, Vec<u8>> {
-        image::GrayImage::from_fn(self.x_len as u32, self.y_len as u32, |x, y| {
-            Luma(
-                [
-                    ((self.get(x as usize, y as usize) / white_value).clamp(0.0, 1.0) * 255.0)
-                        as u8,
-                ],
-            )
+    pub fn as_image(&self, white_value: f32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+        image::RgbImage::from_fn(self.x_len as u32, self.y_len as u32, |x, y| {
+            let value = self.get(x as usize, y as usize);
+            if value >= white_value {
+                Rgb([255, 0, 0])
+            } else {
+                let value_u8 =
+                    ((value / white_value).clamp(0.0, 1.0) * 255.0) as u8;
+                Rgb([value_u8, value_u8, value_u8])
+            }
         })
     }
 }
 
-impl<T: Copy> Matrix for ArrayMatrix<T> {
+impl<T: Copy + Default> Matrix for ArrayMatrix<T> {
     type Item = T;
 
     fn x_len(&self) -> usize {
@@ -84,10 +126,17 @@ impl<T: Copy> Matrix for ArrayMatrix<T> {
     }
 
     fn get(&self, x_index: usize, y_index: usize) -> T {
+        // debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
+        // debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
+        if x_index >= self.x_len || y_index >= self.y_len {
+            return T::default();
+        }
         self.store[y_index * self.x_len + x_index]
     }
 
     fn set(&mut self, x_index: usize, y_index: usize, item: T) {
+        debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
+        debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
         self.store[y_index * self.x_len + x_index] = item;
     }
 }
