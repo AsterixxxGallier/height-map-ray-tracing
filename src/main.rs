@@ -1,4 +1,4 @@
-use crate::matrix::{ArrayMatrix, Matrix};
+use crate::map::{ArrayMap, Map};
 use traversal::pixel::PixelTraversal;
 use crate::ray::{Ray2, Ray3};
 use image::{Rgb, RgbImage};
@@ -11,23 +11,23 @@ use std::time::Instant;
 use tiff::decoder::{Decoder, DecodingResult};
 
 pub mod traversal;
-pub mod matrix;
+pub mod map;
 pub mod ray;
 
-pub fn is_line_free<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray_3: Ray3<T>) -> bool {
+pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray_3: Ray3<T>) -> bool {
     let ray_2 = ray_3.as_ray_2();
     let mut pixel_traversal = PixelTraversal::new(ray_2);
 
     if ray_3.diff_z >= T::zero() {
         pixel_traversal.all(|segment| {
-            matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
+            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
                 < (ray_3.start_z + segment.start_t * ray_3.diff_z)
                     .to_f32()
                     .unwrap()
         })
     } else {
         pixel_traversal.all(|segment| {
-            matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
+            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
                 < (ray_3.start_z + segment.end_t * ray_3.diff_z)
                     .to_f32()
                     .unwrap()
@@ -35,9 +35,9 @@ pub fn is_line_free<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray_3: Ray3<T>)
     }
 }
 
-pub fn max_z<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray2<T>) -> Option<f32> {
+pub fn max_z<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray2<T>) -> Option<f32> {
     PixelTraversal::new(ray)
-        .map(|segment| matrix.get(segment.pixel_x as usize, segment.pixel_y as usize))
+        .map(|segment| map.get(segment.pixel_x as usize, segment.pixel_y as usize))
         .reduce(|a, b| a.max(b))
 }
 
@@ -58,8 +58,8 @@ fn main() {
     let y_size = 2000;
     let z_size = 100;
 
-    let matrix = ArrayMatrix::from_vec(x_size, y_size, data);
-    matrix.save_as_image(100.0, "map.png");
+    let map = ArrayMap::from_vec(x_size, y_size, data);
+    map.save_as_image(100.0, "map.png");
 
     let start_y_resolution = 1;
     let angle_resolution = 1;
@@ -94,7 +94,7 @@ fn main() {
                     ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f64);
                     ray.diff_y = dist_y;
                 }
-                let max_z = max_z(&matrix, ray).unwrap();
+                let max_z = max_z(&map, ray).unwrap();
                 (max_z / z_size as f32 * 255.0).min(255.0) as u8
             })
             .collect_into_vec(&mut values);
@@ -111,8 +111,8 @@ fn main() {
         num_rays,
         elapsed,
         num_rays as f64 / elapsed.as_secs_f64() / 1e6,
-        elapsed.as_nanos() as f64 / (num_rays as usize * matrix.len()) as f64 * 1e6,
-        num_rays as f64 * matrix.len() as f64 / elapsed.as_secs_f64() / 1e12,
+        elapsed.as_nanos() as f64 / (num_rays as usize * map.len()) as f64 * 1e6,
+        num_rays as f64 * map.len() as f64 / elapsed.as_secs_f64() / 1e12,
     );
     image.save("out.png").unwrap();
 }
