@@ -4,18 +4,22 @@ use crate::combined_pixel_traversal::CombinedPixelTraversal;
 use crate::matrix::{ArrayMatrix, Matrix};
 use crate::ray::Ray;
 use crate::ray_z::RayZ;
-use crate::separate_pixel_traversal::{XPixelTraversal, YPixelTraversal};
+use crate::separate_traversal::{XBoundaryTraversal, YBoundaryTraversal};
 use image::{Rgb, RgbImage};
+use indicatif::ProgressStyle;
 use num_traits::Float;
 use rand::distr::Uniform;
-use rand::prelude::SmallRng;
 use rand::SeedableRng;
 use rand_distr::Exp1;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 use std::f64::consts::PI;
 use std::fmt::Debug;
+use std::fs::File;
 use std::time::Instant;
-use crate::separate_traversal::{XBoundaryTraversal, YBoundaryTraversal};
+use tiff::decoder::{Decoder, DecodingResult};
 
+mod float_utils;
 pub mod bounds;
 pub mod combined_pixel_traversal;
 pub mod combined_traversal;
@@ -68,25 +72,41 @@ pub fn max_z_separate<M: Matrix<Item = f32>>(matrix: &M, ray: Ray<f64>) -> Optio
         .flatten()
         .map(|crossing| matrix.get(crossing.next_x_index as usize, crossing.y_index as usize))
         .chain(
-            y_traversal
-                .into_iter()
-                .flatten()
-                .map(|crossing| matrix.get(crossing.x_index as usize, crossing.next_y_index as usize)),
+            y_traversal.into_iter().flatten().map(|crossing| {
+                matrix.get(crossing.x_index as usize, crossing.next_y_index as usize)
+            }),
         )
         .reduce(|a, b| a.max(b))
 }
 
 fn main() {
-    let x_size = 2048;
-    let y_size = 2048;
-    let z_size = 15;
+    let file = File::open("LHD_FXX_0648_6863_MNS_O_0M50_LAMB93_IGN69.tif").unwrap();
+    let io = std::io::BufReader::new(file);
+    let mut reader = Decoder::new(io).unwrap();
+
+    let mut data = DecodingResult::F32(vec![]);
+
+    let colortype = reader.colortype().unwrap();
+    let dimensions = reader.dimensions().unwrap();
+    let layout = reader.read_image_to_buffer(&mut data).unwrap();
+
+    let DecodingResult::F32(data) = data else {
+        panic!()
+    };
+
+    let x_size = 2000;
+    let y_size = 2000;
+    let z_size = 100;
     let x_distribution = Uniform::new(0.0, x_size as f64).unwrap();
     let y_distribution = Uniform::new(0.0, y_size as f64).unwrap();
     let z_distribution = Uniform::new(0.0, z_size as f32).unwrap();
     let height_distribution = Exp1;
 
-    let mut rng = SmallRng::seed_from_u64(0);
-    let mut matrix = ArrayMatrix::<f32>::random(x_size, y_size, height_distribution, &mut rng);
+    let matrix = ArrayMatrix::from_vec(x_size, y_size, data);
+    matrix.save_as_image(100.0, "map.png");
+
+    // let mut rng = SmallRng::seed_from_u64(0);
+    // let mut matrix = ArrayMatrix::<f32>::random(x_size, y_size, height_distribution, &mut rng);
 
     let start = Instant::now();
     let start_y_resolution = 1;
@@ -95,11 +115,13 @@ fn main() {
         (y_size * start_y_resolution) as u32,
         (y_size * angle_resolution) as u32 - 1,
     );
+    let progress_bar = indicatif::ProgressBar::new((y_size * start_y_resolution) as u64);
     for start_y_index in 0..y_size * start_y_resolution {
-        println!("{}/{}", start_y_index + 1, y_size * start_y_resolution);
+        // println!("{}/{}", start_y_index + 1, y_size * start_y_resolution);
+        progress_bar.inc(1);
         let start_y = (start_y_index as f64 + 0.5) / start_y_resolution as f64;
         let values: Vec<u8> = (1..y_size * angle_resolution)
-            // .into_par_iter()
+            .into_par_iter()
             .map(|angle_index| {
                 let angle =
                     (angle_index as f64 / angle_resolution as f64 / y_size as f64 - 0.5) * PI;
@@ -120,7 +142,7 @@ fn main() {
                     ray.diff_y = dist_y;
                 }
                 let mut max_z = max_z(&matrix, ray).unwrap();
-                (max_z / 15.0 * 255.0) as u8
+                (max_z / z_size as f32 * 255.0).min(255.0) as u8
             })
             .collect();
         for (index, value) in values.into_iter().enumerate() {
@@ -128,6 +150,7 @@ fn main() {
             image.put_pixel(start_y_index as u32, index as u32, value);
         }
     }
+    progress_bar.finish();
     let elapsed = start.elapsed();
     let num_rays = image.width() * image.height();
     println!(

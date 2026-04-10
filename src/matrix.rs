@@ -68,6 +68,19 @@ impl<T: Copy + Default> ArrayMatrix<T> {
             y_len,
         }
     }
+
+    pub fn from_vec(
+        x_len: usize,
+        y_len: usize,
+        vec: Vec<T>,
+    ) -> Self {
+        assert_eq!(vec.len(), x_len * y_len);
+        Self {
+            store: vec.into_boxed_slice(),
+            x_len,
+            y_len,
+        }
+    }
 }
 
 impl ArrayMatrix<f32> {
