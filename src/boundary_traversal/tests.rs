@@ -1,5 +1,5 @@
 use crate::ray::Ray;
-use crate::boundary_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
+use crate::boundary_traversal::{BoundaryCrossing, BoundaryTraversal, BoundaryType};
 
 #[test]
 fn only_x_increasing() {
@@ -10,25 +10,25 @@ fn only_x_increasing() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.25,
-        last_x_index: 0,
-        next_x_index: 1,
-        y_index: 0,
+        pixel_x: 1,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.5,
-        last_x_index: 1,
-        next_x_index: 2,
-        y_index: 0,
+        pixel_x: 2,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.75,
-        last_x_index: 2,
-        next_x_index: 3,
-        y_index: 0,
+        pixel_x: 3,
+        pixel_y: 0,
     }));
     assert_eq!(traversal.next(), None);
 }
@@ -42,33 +42,33 @@ fn only_x_increasing_starts_out_of_bounds() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::<f32>::new(ray);
+    let mut traversal = BoundaryTraversal::<f32>::new(ray);
 
     dbg!(&traversal);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.2,
-        last_x_index: -1,
-        next_x_index: 0,
-        y_index: 0,
+        pixel_x: 0,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.4,
-        last_x_index: 0,
-        next_x_index: 1,
-        y_index: 0,
+        pixel_x: 1,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.6,
-        last_x_index: 1,
-        next_x_index: 2,
-        y_index: 0,
+        pixel_x: 2,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.8,
-        last_x_index: 2,
-        next_x_index: 3,
-        y_index: 0,
+        pixel_x: 3,
+        pixel_y: 0,
     }));
     assert_eq!(traversal.next(), None);
 }
@@ -82,25 +82,25 @@ fn only_x_decreasing() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.25,
-        last_x_index: 3,
-        next_x_index: 2,
-        y_index: 0,
+        pixel_x: 2,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.5,
-        last_x_index: 2,
-        next_x_index: 1,
-        y_index: 0,
+        pixel_x: 1,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.75,
-        last_x_index: 1,
-        next_x_index: 0,
-        y_index: 0,
+        pixel_x: 0,
+        pixel_y: 0,
     }));
     assert_eq!(traversal.next(), None);
 }
@@ -114,25 +114,25 @@ fn only_y_increasing() {
         diff_y: 4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::Y,
         t: 0.25,
-        x_index: 0,
-        last_y_index: 0,
-        next_y_index: 1,
+        pixel_x: 0,
+        pixel_y: 1,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::Y,
         t: 0.5,
-        x_index: 0,
-        last_y_index: 1,
-        next_y_index: 2,
+        pixel_x: 0,
+        pixel_y: 2,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::Y,
         t: 0.75,
-        x_index: 0,
-        last_y_index: 2,
-        next_y_index: 3,
+        pixel_x: 0,
+        pixel_y: 3,
     }));
     assert_eq!(traversal.next(), None);
 }
@@ -146,25 +146,25 @@ fn only_y_decreasing() {
         diff_y: -4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::Y,
         t: 0.25,
-        x_index: 0,
-        last_y_index: 3,
-        next_y_index: 2,
+        pixel_x: 0,
+        pixel_y: 2,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::Y,
         t: 0.5,
-        x_index: 0,
-        last_y_index: 2,
-        next_y_index: 1,
+        pixel_x: 0,
+        pixel_y: 1,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::Y,
         t: 0.75,
-        x_index: 0,
-        last_y_index: 1,
-        next_y_index: 0,
+        pixel_x: 0,
+        pixel_y: 0,
     }));
     assert_eq!(traversal.next(), None);
 }
@@ -178,28 +178,25 @@ fn perfectly_diagonal_increasing() {
         diff_y: 4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.25,
-        last_x_index: 0,
-        next_x_index: 1,
-        last_y_index: 0,
-        next_y_index: 1,
+        pixel_x: 1,
+        pixel_y: 1,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.5,
-        last_x_index: 1,
-        next_x_index: 2,
-        last_y_index: 1,
-        next_y_index: 2,
+        pixel_x: 2,
+        pixel_y: 2,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.75,
-        last_x_index: 2,
-        next_x_index: 3,
-        last_y_index: 2,
-        next_y_index: 3,
+        pixel_x: 3,
+        pixel_y: 3,
     }));
 
     assert_eq!(traversal.next(), None);
@@ -214,28 +211,25 @@ fn perfectly_diagonal_decreasing() {
         diff_y: -4.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.25,
-        last_x_index: 3,
-        next_x_index: 2,
-        last_y_index: 3,
-        next_y_index: 2,
+        pixel_x: 2,
+        pixel_y: 2,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.5,
-        last_x_index: 2,
-        next_x_index: 1,
-        last_y_index: 2,
-        next_y_index: 1,
+        pixel_x: 1,
+        pixel_y: 1,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.75,
-        last_x_index: 1,
-        next_x_index: 0,
-        last_y_index: 1,
-        next_y_index: 0,
+        pixel_x: 0,
+        pixel_y: 0,
     }));
 
     assert_eq!(traversal.next(), None);
@@ -250,26 +244,25 @@ fn half_diagonal_increasing() {
         diff_y: 2.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = BoundaryTraversal::new(ray);
 
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.25,
-        last_x_index: 0,
-        next_x_index: 1,
-        y_index: 0,
+        pixel_x: 1,
+        pixel_y: 0,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::XY,
         t: 0.5,
-        last_x_index: 1,
-        next_x_index: 2,
-        last_y_index: 0,
-        next_y_index: 1,
+        pixel_x: 2,
+        pixel_y: 1,
     }));
-    assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
+    assert_eq!(traversal.next(), Some(BoundaryCrossing {
+        boundary_type: BoundaryType::X,
         t: 0.75,
-        last_x_index: 2,
-        next_x_index: 3,
-        y_index: 1,
+        pixel_x: 3,
+        pixel_y: 1,
     }));
 
     assert_eq!(traversal.next(), None);

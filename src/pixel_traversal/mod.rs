@@ -1,19 +1,19 @@
 use num_traits::Float;
 use crate::ray::Ray;
-use crate::boundary_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
+use crate::boundary_traversal::BoundaryTraversal;
 
-pub struct CombinedPixelTraversal<T> {
-    boundary_traversal: CombinedBoundaryTraversal<T>,
+pub struct PixelTraversal<T> {
+    boundary_traversal: BoundaryTraversal<T>,
     last_t: T,
-    current: Option<(i32, i32)>,
+    current_pixel: Option<(i32, i32)>,
 }
 
-impl<T: Float> CombinedPixelTraversal<T> {
+impl<T: Float> PixelTraversal<T> {
     pub fn new(ray: Ray<T>) -> Self {
-        let boundary_traversal = CombinedBoundaryTraversal::new(ray);
+        let boundary_traversal = BoundaryTraversal::new(ray);
         Self {
             last_t: T::zero(),
-            current: Some((boundary_traversal.pixel_x(), boundary_traversal.pixel_y())),
+            current_pixel: Some((boundary_traversal.pixel_x(), boundary_traversal.pixel_y())),
             boundary_traversal,
         }
     }
@@ -27,44 +27,23 @@ pub struct PixelSegment<T> {
     pub end_t: T,
 }
 
-impl<T: Float> Iterator for CombinedPixelTraversal<T> {
+impl<T: Float> Iterator for PixelTraversal<T> {
     type Item = PixelSegment<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (pixel_x, pixel_y) = self.current?;
+        let (pixel_x, pixel_y) = self.current_pixel?;
         if let Some(crossing) = self.boundary_traversal.next() {
-            let (new_t, new_x, new_y) = match crossing {
-                BoundaryCrossing::X {
-                    t,
-                    last_x_index: _,
-                    next_x_index,
-                    y_index,
-                } => (t, next_x_index, y_index),
-                BoundaryCrossing::Y {
-                    t,
-                    x_index,
-                    last_y_index: _,
-                    next_y_index,
-                } => (t, x_index, next_y_index),
-                BoundaryCrossing::XY {
-                    t,
-                    last_x_index: _,
-                    next_x_index,
-                    last_y_index: _,
-                    next_y_index,
-                } => (t, next_x_index, next_y_index),
-            };
-            self.current = Some((new_x, new_y));
+            self.current_pixel = Some((crossing.pixel_x, crossing.pixel_y));
             let start_t = self.last_t;
-            self.last_t = new_t;
+            self.last_t = crossing.t;
             Some(PixelSegment {
                 pixel_x,
                 pixel_y,
                 start_t,
-                end_t: new_t,
+                end_t: crossing.t,
             })
         } else {
-            self.current = None;
+            self.current_pixel = None;
             Some(PixelSegment {
                 pixel_x,
                 pixel_y,

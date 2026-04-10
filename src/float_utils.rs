@@ -70,7 +70,7 @@ pub(crate) fn integers_between<T: Float>(start: T, end: T) -> usize {
 /// Integer and floating-point variables essential to the pixel boundary traversal algorithm
 /// introduced by Amanatides and Woo in their paper "A Fast Voxel Traversal Algorithm".
 #[derive(Debug, Clone)]
-pub(crate) struct CombinedBoundaryTraversalVariables<T> {
+pub(crate) struct BoundaryTraversalVariables<T> {
     pub(crate) step_x: i32,
     pub(crate) step_y: i32,
     pub(crate) pixel_x: i32,
@@ -81,7 +81,7 @@ pub(crate) struct CombinedBoundaryTraversalVariables<T> {
     pub(crate) t_max_y: T,
 }
 
-impl<T: Float> CombinedBoundaryTraversalVariables<T> {
+impl<T: Float> BoundaryTraversalVariables<T> {
     pub(crate) fn new(ray: Ray<T>) -> Self {
         let step_x = ray.diff_x.signum().to_i32().unwrap();
         let step_y = ray.diff_y.signum().to_i32().unwrap();

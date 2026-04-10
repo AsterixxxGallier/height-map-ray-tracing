@@ -108,7 +108,7 @@ impl ArrayMatrix<f32> {
 
 impl ArrayMatrix<f32> {
     pub fn save_as_image(&self, white_value: f32, path: &str) {
-        self.as_image(white_value).save(path);
+        self.as_image(white_value).save(path).unwrap();
     }
 
     pub fn as_image(&self, white_value: f32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
