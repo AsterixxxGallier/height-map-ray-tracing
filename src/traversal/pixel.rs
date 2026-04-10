@@ -1,6 +1,6 @@
 use num_traits::Float;
-use crate::ray::Ray;
-use crate::boundary_traversal::BoundaryTraversal;
+use crate::ray::Ray2;
+use crate::traversal::boundary::BoundaryTraversal;
 
 pub struct PixelTraversal<T> {
     boundary_traversal: BoundaryTraversal<T>,
@@ -9,7 +9,7 @@ pub struct PixelTraversal<T> {
 }
 
 impl<T: Float> PixelTraversal<T> {
-    pub fn new(ray: Ray<T>) -> Self {
+    pub fn new(ray: Ray2<T>) -> Self {
         let boundary_traversal = BoundaryTraversal::new(ray);
         Self {
             last_t: T::zero(),

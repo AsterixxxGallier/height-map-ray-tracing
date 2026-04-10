@@ -1,7 +1,6 @@
 use crate::matrix::{ArrayMatrix, Matrix};
-use crate::pixel_traversal::PixelTraversal;
-use crate::ray::Ray;
-use crate::ray_z::RayZ;
+use traversal::pixel::PixelTraversal;
+use crate::ray::{Ray2, Ray3};
 use image::{Rgb, RgbImage};
 use num_traits::Float;
 use rayon::iter::ParallelIterator;
@@ -11,35 +10,32 @@ use std::fs::File;
 use std::time::Instant;
 use tiff::decoder::{Decoder, DecodingResult};
 
-pub mod boundary_traversal;
-mod float_utils;
+pub mod traversal;
 pub mod matrix;
-pub mod pixel_traversal;
 pub mod ray;
-pub mod ray_z;
 
-pub fn is_line_free<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray_z: RayZ<T>) -> bool {
-    let ray = ray_z.as_ray();
-    let mut pixel_traversal = PixelTraversal::new(ray);
+pub fn is_line_free<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray_3: Ray3<T>) -> bool {
+    let ray_2 = ray_3.as_ray_2();
+    let mut pixel_traversal = PixelTraversal::new(ray_2);
 
-    if ray_z.diff_z >= T::zero() {
+    if ray_3.diff_z >= T::zero() {
         pixel_traversal.all(|segment| {
             matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray_z.start_z + segment.start_t * ray_z.diff_z)
+                < (ray_3.start_z + segment.start_t * ray_3.diff_z)
                     .to_f32()
                     .unwrap()
         })
     } else {
         pixel_traversal.all(|segment| {
             matrix.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray_z.start_z + segment.end_t * ray_z.diff_z)
+                < (ray_3.start_z + segment.end_t * ray_3.diff_z)
                     .to_f32()
                     .unwrap()
         })
     }
 }
 
-pub fn max_z<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray<T>) -> Option<f32> {
+pub fn max_z<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray2<T>) -> Option<f32> {
     PixelTraversal::new(ray)
         .map(|segment| matrix.get(segment.pixel_x as usize, segment.pixel_y as usize))
         .reduce(|a, b| a.max(b))
@@ -83,7 +79,7 @@ fn main() {
                 let angle =
                     (angle_index as f64 / angle_resolution as f64 / y_size as f64 - 0.5) * PI;
                 let slope = angle.tan();
-                let mut ray = Ray {
+                let mut ray = Ray2 {
                     start_x: 0.0,
                     start_y,
                     diff_x: x_size as f64,

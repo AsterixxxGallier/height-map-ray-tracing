@@ -1,5 +1,7 @@
-use crate::ray::Ray;
+use super::BoundaryType;
+use crate::ray::Ray2;
 use num_traits::Float;
+use std::cmp::Ordering;
 
 /// The coordinate of the first pixel entered by the ray that starts at `start` and moves in the
 /// direction given by `diff`. If `start` has a non-zero fractional part, i.e. is between two
@@ -82,7 +84,7 @@ pub(crate) struct BoundaryTraversalVariables<T> {
 }
 
 impl<T: Float> BoundaryTraversalVariables<T> {
-    pub(crate) fn new(ray: Ray<T>) -> Self {
+    pub(crate) fn new(ray: Ray2<T>) -> Self {
         let step_x = ray.diff_x.signum().to_i32().unwrap();
         let step_y = ray.diff_y.signum().to_i32().unwrap();
 
@@ -128,5 +130,14 @@ impl<T: Float> BoundaryTraversalVariables<T> {
     pub(crate) fn step_y(&mut self) {
         self.t_max_y = self.t_max_y + self.t_delta_y;
         self.pixel_y += self.step_y;
+    }
+
+    #[inline]
+    pub(crate) fn next_boundary_type(&self) -> BoundaryType {
+        match self.t_max_x.partial_cmp(&self.t_max_y) {
+            Some(Ordering::Less) => BoundaryType::X,
+            Some(Ordering::Greater) => BoundaryType::Y,
+            Some(Ordering::Equal) | None => BoundaryType::XY,
+        }
     }
 }
