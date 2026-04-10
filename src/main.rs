@@ -1,4 +1,4 @@
-use crate::map::{ArrayMap, Map};
+use crate::map::{ArrayMap, ChunkedArrayMap, ConstantChunkedArrayMap, Map};
 use crate::ray::{Ray2, Ray3};
 use image::{Rgb, RgbImage};
 use num_traits::Float;
@@ -10,10 +10,10 @@ use std::time::Instant;
 use tiff::decoder::{Decoder, DecodingResult};
 use traversal::pixel::PixelTraversal;
 
-pub mod traversal;
 pub mod map;
 pub mod ray;
 pub mod tiles;
+pub mod traversal;
 
 pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray3<T>) -> bool {
     let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
@@ -28,9 +28,7 @@ pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray3<T>) -> bool
     } else {
         pixel_traversal.all(|segment| {
             map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray.start_z + segment.end_t * ray.diff_z)
-                    .to_f32()
-                    .unwrap()
+                < (ray.start_z + segment.end_t * ray.diff_z).to_f32().unwrap()
         })
     }
 }
@@ -68,7 +66,24 @@ fn main() {
     let y_size = 2000;
     let z_size = 100;
 
-    let map = ArrayMap::from_vec(x_size, y_size, data);
+    // let map = ArrayMap::from_vec(x_size, y_size, data);
+    // let map = ConstantChunkedArrayMap::<f32, 128>::from_fn(
+    //     x_size.next_power_of_two(),
+    //     y_size.next_power_of_two(),
+    //     |x, y| if x < x_size && y < y_size { map.get(x, y) } else { 0.0 },
+    // );
+    // let map = ConstantChunkedArrayMap::<f32, 100>::from_fn(
+    //     x_size,
+    //     y_size,
+    //     |x, y| if x < x_size && y < y_size { map.get(x, y) } else { 0.0 },
+    // );
+    let map = ChunkedArrayMap::from_vec(
+        x_size,
+        y_size,
+        20,
+        20,
+        data,
+    );
     map.save_as_image(100.0, "map.png");
 
     let start_y_resolution = 1;
