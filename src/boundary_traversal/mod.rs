@@ -1,4 +1,4 @@
-use crate::float_utils::CombinedBoundaryTraversalVariables;
+use crate::float_utils::{integers_between, CombinedBoundaryTraversalVariables};
 use crate::ray::Ray;
 use num_traits::float::Float;
 use num_traits::ConstOne;
@@ -9,12 +9,18 @@ mod tests;
 #[derive(Debug)]
 pub struct CombinedBoundaryTraversal<T> {
     v: CombinedBoundaryTraversalVariables<T>,
+    remaining_crossings: usize,
 }
 
 impl<T: Float> CombinedBoundaryTraversal<T> {
     pub fn new(ray: Ray<T>) -> Self {
+        let x_crossings = integers_between(ray.start_x, ray.end_x());
+        let y_crossings = integers_between(ray.start_y, ray.end_y());
+        let total_crossings = x_crossings + y_crossings;
+
         Self {
             v: CombinedBoundaryTraversalVariables::new(ray),
+            remaining_crossings: total_crossings,
         }
     }
 
@@ -56,11 +62,13 @@ impl<T: Float> Iterator for CombinedBoundaryTraversal<T> {
     fn next(&mut self) -> Option<Self::Item> {
         let t = self.v.t_max_x.min(self.v.t_max_y);
 
-        if t >= T::from(0.999999f32).unwrap() {
-            return None;
-        }
-
         if self.v.t_max_x < self.v.t_max_y {
+            if self.remaining_crossings == 0 {
+                return None;
+            }
+
+            self.remaining_crossings -= 1;
+
             // we cross over the next x-boundary first
             let last_x_index = self.v.pixel_x;
 
@@ -75,7 +83,13 @@ impl<T: Float> Iterator for CombinedBoundaryTraversal<T> {
                 next_x_index,
                 y_index,
             })
-        } else if self.v.t_max_x > self.v.t_max_y {
+        } else if self.v.t_max_y < self.v.t_max_x {
+            if self.remaining_crossings == 0 {
+                return None;
+            }
+
+            self.remaining_crossings -= 1;
+
             // we cross over the next y-boundary first
             let last_y_index = self.v.pixel_y;
 
@@ -91,6 +105,12 @@ impl<T: Float> Iterator for CombinedBoundaryTraversal<T> {
                 next_y_index,
             })
         } else {
+            if self.remaining_crossings <= 1 {
+                return None;
+            }
+
+            self.remaining_crossings -= 2;
+
             // we cross over the next x-boundary and the next y-boundary simultaneously
             let last_x_index = self.v.pixel_x;
             let last_y_index = self.v.pixel_y;

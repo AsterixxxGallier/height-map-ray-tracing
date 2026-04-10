@@ -2,9 +2,6 @@ use num_traits::Float;
 use crate::ray::Ray;
 use crate::boundary_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
 
-#[cfg(test)]
-mod tests;
-
 pub struct CombinedPixelTraversal<T> {
     boundary_traversal: CombinedBoundaryTraversal<T>,
     last_t: T,

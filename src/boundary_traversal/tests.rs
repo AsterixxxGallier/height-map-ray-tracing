@@ -42,7 +42,7 @@ fn only_x_increasing_starts_out_of_bounds() {
         diff_y: 0.0,
     };
 
-    let mut traversal = CombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::<f32>::new(ray);
 
     dbg!(&traversal);
 
