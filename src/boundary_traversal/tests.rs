@@ -1,6 +1,5 @@
-use crate::bounds::Bounds;
 use crate::ray::Ray;
-use crate::thin_combined_traversal::{BoundaryCrossing, ThinCombinedBoundaryTraversal};
+use crate::boundary_traversal::{BoundaryCrossing, CombinedBoundaryTraversal};
 
 #[test]
 fn only_x_increasing() {
@@ -11,7 +10,7 @@ fn only_x_increasing() {
         diff_y: 0.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,
@@ -43,7 +42,7 @@ fn only_x_increasing_starts_out_of_bounds() {
         diff_y: 0.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     dbg!(&traversal);
 
@@ -83,7 +82,7 @@ fn only_x_decreasing() {
         diff_y: 0.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,
@@ -115,7 +114,7 @@ fn only_y_increasing() {
         diff_y: 4.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
         t: 0.25,
@@ -147,7 +146,7 @@ fn only_y_decreasing() {
         diff_y: -4.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::Y {
         t: 0.25,
@@ -179,7 +178,7 @@ fn perfectly_diagonal_increasing() {
         diff_y: 4.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
         t: 0.25,
@@ -215,7 +214,7 @@ fn perfectly_diagonal_decreasing() {
         diff_y: -4.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::XY {
         t: 0.25,
@@ -251,7 +250,7 @@ fn half_diagonal_increasing() {
         diff_y: 2.0,
     };
 
-    let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
+    let mut traversal = CombinedBoundaryTraversal::new(ray);
 
     assert_eq!(traversal.next(), Some(BoundaryCrossing::X {
         t: 0.25,

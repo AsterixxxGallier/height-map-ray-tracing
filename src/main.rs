@@ -1,47 +1,37 @@
 #![feature(hint_prefetch)]
 #![allow(unused)]
 
-use std::arch::asm;
-use crate::combined_pixel_traversal::{CombinedPixelTraversal, ThinCombinedPixelTraversal, ThinCombinedPixelTraversalWithoutT};
 use crate::matrix::{ArrayMatrix, Matrix};
+use crate::pixel_traversal::{
+    CombinedPixelTraversal,
+};
 use crate::ray::Ray;
 use crate::ray_z::RayZ;
-use crate::separate_traversal::{XBoundaryTraversal, YBoundaryTraversal};
 use image::{Rgb, RgbImage};
-use indicatif::ProgressStyle;
 use num_traits::Float;
 use rand::distr::Uniform;
 use rand::SeedableRng;
 use rand_distr::Exp1;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
 use rayon::iter::ParallelIterator;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
 use std::f64::consts::PI;
 use std::fmt::Debug;
 use std::fs::File;
-use std::hint::{black_box, prefetch_read, Locality};
 use std::time::Instant;
-use loop_code::repeat;
 use tiff::decoder::{Decoder, DecodingResult};
-use crate::float_utils::{integers_between, CombinedBoundaryTraversalVariables};
-use crate::thin_combined_traversal::{BoundaryCrossing, ThinCombinedBoundaryTraversal};
 
+pub mod boundary_traversal;
 mod float_utils;
-pub mod bounds;
-pub mod combined_pixel_traversal;
-pub mod combined_traversal;
-pub mod in_bounds_combined_traversal;
 pub mod matrix;
+pub mod pixel_traversal;
 pub mod ray;
 pub mod ray_z;
-pub mod separate_pixel_traversal;
-pub mod separate_traversal;
 #[cfg(test)]
 mod tests;
-pub mod thin_combined_traversal;
 
 pub fn is_line_free<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray_z: RayZ<T>) -> bool {
     let ray = ray_z.as_ray();
-    let mut pixel_traversal = ThinCombinedPixelTraversal::new(ray);
+    let mut pixel_traversal = CombinedPixelTraversal::new(ray);
 
     if ray_z.diff_z >= T::zero() {
         pixel_traversal.all(|segment| {
@@ -60,105 +50,11 @@ pub fn is_line_free<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray_z: RayZ<T>)
     }
 }
 
-pub fn max_z_fast<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray<T>) -> f32 {
-    let mut v = CombinedBoundaryTraversalVariables::new(ray);
-    let x_crossings = integers_between(ray.start_x, ray.end_x());
-    let y_crossings = integers_between(ray.start_y, ray.end_y());
-    let crossings = x_crossings + y_crossings;
-
-    let mut max_z = matrix.get(v.pixel_x as usize, v.pixel_y as usize);
-    for _ in 0..crossings {
-        if v.t_max_x <= v.t_max_y {
-            v.step_x();
-        } else {
-            v.step_y();
-        }
-
-        let z = matrix.get(v.pixel_x as usize, v.pixel_y as usize);
-        max_z = max_z.max(z);
-    }
-    max_z
-}
-
-#[inline(never)]
-fn hot_loop<T: Float>(mut v: CombinedBoundaryTraversalVariables<T>, crossings: usize, mut callback: impl FnMut(usize, usize)) {
-    for _ in 0..(crossings >> 4) {
-        repeat!(16 {
-            if v.t_max_x <= v.t_max_y {
-                v.step_x();
-            } else {
-                v.step_y();
-            }
-
-            (callback)(v.pixel_x as usize, v.pixel_y as usize);
-        });
-    }
-
-    for _ in 0..(crossings & 0b1111) {
-        if v.t_max_x <= v.t_max_y {
-            v.step_x();
-        } else {
-            v.step_y();
-        }
-
-        (callback)(v.pixel_x as usize, v.pixel_y as usize);
-    }
-}
-
-pub fn max_z_fast_variant<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray<T>) -> f32 {
-    let mut v = CombinedBoundaryTraversalVariables::new(ray);
-    let x_crossings = integers_between(ray.start_x, ray.end_x());
-    let y_crossings = integers_between(ray.start_y, ray.end_y());
-    let crossings = x_crossings + y_crossings;
-
-    let mut max_z = matrix.get(v.pixel_x as usize, v.pixel_y as usize);
-    hot_loop(v, crossings, #[inline(always)] |x, y| max_z = max_z.max(matrix.get(x, y)));
-    max_z
-
-    /*let mut traversal = ThinCombinedBoundaryTraversal::new(ray);
-    let first_z = matrix.get(traversal.pixel_x() as usize, traversal.pixel_y() as usize);
-    traversal.map(|crossing| {
-        let (x, y) = match crossing {
-            BoundaryCrossing::X { next_x_index, y_index, .. } => (next_x_index, y_index),
-            BoundaryCrossing::Y { x_index, next_y_index, .. } => (x_index, next_y_index),
-            BoundaryCrossing::XY { next_x_index, next_y_index, .. } => (next_x_index, next_y_index),
-        };
-        matrix.get(x as usize, y as usize)
-    }).fold(first_z, |a, b| a.max(b))*/
-}
-
-#[inline(never)]
-pub fn max_z_with_t<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray<T>) -> Option<f32> {
-    let mut pixel_traversal = ThinCombinedPixelTraversal::new(ray);
+pub fn max_z<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray<T>) -> Option<f32> {
+    let mut pixel_traversal = CombinedPixelTraversal::new(ray);
 
     pixel_traversal
         .map(|segment| matrix.get(segment.pixel_x as usize, segment.pixel_y as usize))
-        .reduce(|a, b| a.max(b))
-}
-
-#[inline(never)]
-pub fn max_z_without_t<M: Matrix<Item = f32>, T: Float>(matrix: &M, ray: Ray<T>) -> Option<f32> {
-    let mut pixel_traversal = ThinCombinedPixelTraversalWithoutT::new(ray);
-
-    pixel_traversal
-        .map(|segment| matrix.get(segment.pixel_x as usize, segment.pixel_y as usize))
-        .reduce(|a, b| a.max(b))
-}
-
-// does not work
-pub fn max_z_separate<M: Matrix<Item = f32>>(matrix: &M, ray: Ray<f64>) -> Option<f32> {
-    let mut x_traversal = XBoundaryTraversal::new(ray);
-    let mut y_traversal = YBoundaryTraversal::new(ray);
-
-    x_traversal
-        .into_iter()
-        .flatten()
-        .map(|crossing| matrix.get(crossing.next_x_index as usize, crossing.y_index as usize))
-        .chain(
-            y_traversal.into_iter().flatten().map(|crossing| {
-                matrix.get(crossing.x_index as usize, crossing.next_y_index as usize)
-            }),
-        )
         .reduce(|a, b| a.max(b))
 }
 
@@ -200,18 +96,6 @@ fn main() {
     let mut values = Vec::with_capacity(y_size * angle_resolution - 1);
     let start = Instant::now();
     let progress_bar = indicatif::ProgressBar::new((y_size * start_y_resolution) as u64);
-    black_box(max_z_with_t(&matrix, Ray {
-        start_x: 0.0,
-        start_y: 0.0,
-        diff_x: 1.0,
-        diff_y: 1.0,
-    }));
-    black_box(max_z_without_t(&matrix, Ray {
-        start_x: 0.0,
-        start_y: 0.0,
-        diff_x: 1.0,
-        diff_y: 1.0,
-    }));
     for start_y_index in 0..y_size * start_y_resolution {
         // println!("{}/{}", start_y_index + 1, y_size * start_y_resolution);
         progress_bar.inc(1);
@@ -237,10 +121,7 @@ fn main() {
                     ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f64);
                     ray.diff_y = dist_y;
                 }
-                // let mut max_z = max_z_fast(&matrix, ray);
-                let mut max_z = max_z_fast_variant(&matrix, ray);
-                // let mut max_z = max_z(&matrix, ray).unwrap();
-                // let mut max_z = max_z_with_t(&matrix, ray).unwrap();
+                let mut max_z = max_z(&matrix, ray).unwrap();
                 (max_z / z_size as f32 * 255.0).min(255.0) as u8
             });
         iterator.collect_into_vec(&mut values);

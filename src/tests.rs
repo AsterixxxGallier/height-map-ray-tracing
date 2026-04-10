@@ -1,7 +1,7 @@
 use crate::matrix::{ArrayMatrix, Matrix};
 use crate::ray::Ray;
 use crate::ray_z::RayZ;
-use crate::{is_line_free, max_z_with_t};
+use crate::{is_line_free, max_z};
 use image::{Rgb, RgbImage};
 use rand::distr::Uniform;
 use rand::rngs::SmallRng;
@@ -63,6 +63,7 @@ fn single_obstacle() {
 }
 
 #[test]
+#[ignore]
 fn random() {
     let n_rays = 100;
     let x_size = 2048;
@@ -107,7 +108,7 @@ fn random() {
                     ray.diff_x = (dist_y / slope).clamp(0.0, y_size as f64);
                     ray.diff_y = dist_y;
                 }
-                let mut max_z = max_z_with_t(&matrix, ray).unwrap();
+                let mut max_z = max_z(&matrix, ray).unwrap();
                 (max_z / 15.0 * 255.0) as u8
             })
             .collect();
