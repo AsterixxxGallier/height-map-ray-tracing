@@ -35,6 +35,8 @@ pub trait Matrix {
     fn get(&self, x_index: usize, y_index: usize) -> Self::Item;
 
     fn set(&mut self, x_index: usize, y_index: usize, item: Self::Item);
+
+    fn pointer(&self, x_index: usize, y_index: usize) -> *const Self::Item;
 }
 
 /// Stores items in a contiguous array on the heap.
@@ -151,6 +153,10 @@ impl<T: Copy + Default> Matrix for ArrayMatrix<T> {
         debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
         debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
         self.store[y_index * self.x_len + x_index] = item;
+    }
+
+    fn pointer(&self, x_index: usize, y_index: usize) -> *const Self::Item {
+        self.store.as_ptr().wrapping_add(y_index * self.x_len + x_index)
     }
 }
 

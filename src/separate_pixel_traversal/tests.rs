@@ -1,4 +1,4 @@
-use crate::combined_pixel_traversal::CombinedPixelTraversal;
+use crate::combined_pixel_traversal::ThinCombinedPixelTraversal;
 use crate::ray::Ray;
 use crate::thin_combined_traversal::ThinCombinedBoundaryTraversal;
 
@@ -16,7 +16,7 @@ fn edge_case() {
     //     dbg!(crossing);
     // });
 
-    let mut traversal = CombinedPixelTraversal::new(ray);
+    let mut traversal = ThinCombinedPixelTraversal::new(ray);
     traversal.for_each(|segment| {
         assert!(segment.pixel_x >= 0, "{segment:?}");
         assert!(segment.pixel_y >= 0, "{segment:?}");
