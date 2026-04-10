@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io;
 use std::path::Path;
 use reqwest::blocking::Client;
+use crate::tiles::{tile_filename, TileCoordinates, TileRegion};
 
 struct TileBounds {
     x_min: f32,
@@ -11,20 +12,19 @@ struct TileBounds {
 }
 
 impl TileBounds {
-    fn new(x: i32, y: i32) -> Self {
+    fn new(coordinates: TileCoordinates) -> Self {
         Self {
-            x_min: (x * 1000) as f32 - 0.25,
-            x_max: ((x + 1) * 1000) as f32 - 0.25,
-            y_min: ((y - 1) * 1000) as f32 + 0.25,
-            y_max: (y * 1000) as f32 + 0.25,
+            x_min: (coordinates.x * 1000) as f32 - 0.25,
+            x_max: ((coordinates.x + 1) * 1000) as f32 - 0.25,
+            y_min: ((coordinates.y - 1) * 1000) as f32 + 0.25,
+            y_max: (coordinates.y * 1000) as f32 + 0.25,
         }
     }
 }
 
-fn generate_url_and_filename(x: i32, y: i32) -> (String, String) {
-    let bounds = TileBounds::new(x, y);
-    let tile_id = format_args!("{x:0>4}_{y:0>4}");
-    let filename = format!("LHD_FXX_{tile_id}_MNS_O_0M50_LAMB93_IGN69.tif");
+fn tile_url_and_filename(coordinates: TileCoordinates) -> (String, String) {
+    let bounds = TileBounds::new(coordinates);
+    let filename = tile_filename(coordinates);
     let url = format!(
         "https://data.geopf.fr/wms-r\
         ?SERVICE=WMS&VERSION=1.3.0&EXCEPTIONS=text/xml&REQUEST=GetMap\
@@ -38,19 +38,12 @@ fn generate_url_and_filename(x: i32, y: i32) -> (String, String) {
     (url, filename)
 }
 
-pub struct Region {
-    pub x_min: i32,
-    pub x_max: i32,
-    pub y_min: i32,
-    pub y_max: i32,
+pub fn download_tile(directory: &str, coordinates: TileCoordinates) {
+    download_tile_with_client(&mut Client::new(), directory, coordinates);
 }
 
-pub fn download_tile(directory: &str, x: i32, y: i32) {
-    download_tile_with_client(&mut Client::new(), directory, x, y);
-}
-
-pub fn download_tile_with_client(client: &Client, directory: &str, x: i32, y: i32) {
-    let (url, filename) = generate_url_and_filename(x, y);
+pub fn download_tile_with_client(client: &Client, directory: &str, coordinates: TileCoordinates) {
+    let (url, filename) = tile_url_and_filename(coordinates);
     let path = Path::new(directory).join(filename);
     match File::create_new(path) {
         Ok(mut file) => {
@@ -62,11 +55,9 @@ pub fn download_tile_with_client(client: &Client, directory: &str, x: i32, y: i3
     }
 }
 
-pub fn download_tiles(directory: &str, region: Region) {
+pub fn download_tiles(directory: &str, region: TileRegion) {
     let client = Client::new();
-    for x in region.x_min..=region.x_max {
-        for y in region.y_min..=region.y_max {
-            download_tile_with_client(&client, directory, x, y);
-        }
+    for coordinates in region.coordinates() {
+        download_tile_with_client(&client, directory, coordinates);
     }
 }

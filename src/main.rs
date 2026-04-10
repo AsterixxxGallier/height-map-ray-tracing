@@ -13,23 +13,22 @@ use traversal::pixel::PixelTraversal;
 pub mod traversal;
 pub mod map;
 pub mod ray;
-pub mod download;
+pub mod tiles;
 
-pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray_3: Ray3<T>) -> bool {
-    let ray_2 = ray_3.as_ray_2();
-    let mut pixel_traversal = PixelTraversal::new(ray_2);
+pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray3<T>) -> bool {
+    let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
 
-    if ray_3.diff_z >= T::zero() {
+    if ray.diff_z >= T::zero() {
         pixel_traversal.all(|segment| {
             map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray_3.start_z + segment.start_t * ray_3.diff_z)
+                < (ray.start_z + segment.start_t * ray.diff_z)
                     .to_f32()
                     .unwrap()
         })
     } else {
         pixel_traversal.all(|segment| {
             map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray_3.start_z + segment.end_t * ray_3.diff_z)
+                < (ray.start_z + segment.end_t * ray.diff_z)
                     .to_f32()
                     .unwrap()
         })
