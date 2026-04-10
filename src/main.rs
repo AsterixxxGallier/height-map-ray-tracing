@@ -1,4 +1,3 @@
-use crate::map::{ArrayMap, Map};
 use crate::ray::{Ray2, Ray3};
 use image::{Rgb, RgbImage};
 use num_traits::Float;
@@ -9,13 +8,14 @@ use std::fs::File;
 use std::time::Instant;
 use tiff::decoder::{Decoder, DecodingResult};
 use traversal::pixel::PixelTraversal;
+use crate::map::Map;
 
 pub mod traversal;
 pub mod map;
 pub mod ray;
 pub mod tiles;
 
-pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray3<T>) -> bool {
+pub fn is_line_free<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> bool {
     let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
 
     if ray.diff_z >= T::zero() {
@@ -35,7 +35,7 @@ pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray3<T>) -> bool
     }
 }
 
-pub fn max_z<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray2<T>) -> Option<f32> {
+pub fn max_z<T: Float>(map: &Map<f32>, ray: Ray2<T>) -> Option<f32> {
     PixelTraversal::new(ray)
         .map(|segment| map.get(segment.pixel_x as usize, segment.pixel_y as usize))
         .reduce(|a, b| a.max(b))
@@ -68,7 +68,7 @@ fn main() {
     let y_size = 2000;
     let z_size = 100;
 
-    let map = ArrayMap::from_vec(x_size, y_size, data);
+    let map = Map::from_vec(x_size, y_size, data);
     map.save_as_image(100.0, "map.png");
 
     let start_y_resolution = 1;

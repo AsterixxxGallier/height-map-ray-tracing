@@ -1,9 +1,8 @@
-use crate::map::ArrayMap;
+use crate::map::Map;
 use crate::tiles::download::download_tiles;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
-use tiff::decoder::{Decoder, DecodingResult};
 
 pub mod download;
 
@@ -29,7 +28,7 @@ impl TileRegion {
 }
 
 pub struct Tiles {
-    tiles: HashMap<TileCoordinates, ArrayMap<f32>>,
+    tiles: HashMap<TileCoordinates, Map<f32>>,
 }
 
 fn tile_filename(coordinates: TileCoordinates) -> String {
@@ -57,17 +56,7 @@ impl Tiles {
                 ),
             };
 
-            let reader = std::io::BufReader::new(file);
-            let mut decoder = Decoder::new(reader).unwrap();
-            let mut data = DecodingResult::F32(vec![]);
-
-            _ = decoder.read_image_to_buffer(&mut data).unwrap();
-
-            let DecodingResult::F32(data) = data else {
-                panic!()
-            };
-
-            let tile = ArrayMap::from_vec(2000, 2000, data);
+            let tile = Map::load_from_tiff(2000, 2000, file);
             self.tiles.insert(coordinates, tile);
         }
     }
@@ -77,7 +66,7 @@ impl Tiles {
         self.load_from_directory(region, directory);
     }
 
-    pub fn tile(&self, coordinates: TileCoordinates) -> Option<&ArrayMap<f32>> {
+    pub fn tile(&self, coordinates: TileCoordinates) -> Option<&Map<f32>> {
         self.tiles.get(&coordinates)
     }
 }

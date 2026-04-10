@@ -1,32 +1,17 @@
+use std::fs::File;
 use image::{ImageBuffer, Rgb};
 use rand::distr::Distribution;
 use rand::Rng;
+use tiff::decoder::{Decoder, DecodingResult};
 
-pub trait Map {
-    type Item;
-
-    fn x_len(&self) -> usize;
-
-    fn y_len(&self) -> usize;
-
-    fn len(&self) -> usize {
-        self.x_len() * self.y_len()
-    }
-
-    fn get(&self, x_index: usize, y_index: usize) -> Self::Item;
-
-    fn set(&mut self, x_index: usize, y_index: usize, item: Self::Item);
-}
-
-/// Stores items in a contiguous array on the heap.
 #[derive(Debug)]
-pub struct ArrayMap<T> {
+pub struct Map<T> {
     store: Box<[T]>,
     x_len: usize,
     y_len: usize,
 }
 
-impl<T: Copy + Default> ArrayMap<T> {
+impl<T: Copy + Default> Map<T> {
     pub fn new(x_len: usize, y_len: usize) -> Self {
         let store = vec![T::default(); x_len * y_len].into_boxed_slice();
         Self {
@@ -62,9 +47,47 @@ impl<T: Copy + Default> ArrayMap<T> {
             y_len,
         }
     }
+
+    pub fn x_len(&self) -> usize {
+        self.x_len
+    }
+
+    pub fn y_len(&self) -> usize {
+        self.y_len
+    }
+
+    pub fn len(&self) -> usize {
+        self.store.len()
+    }
+
+    pub fn get(&self, x_index: usize, y_index: usize) -> T {
+        debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
+        debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
+        self.store[y_index * self.x_len + x_index]
+    }
+
+    pub fn set(&mut self, x_index: usize, y_index: usize, item: T) {
+        debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
+        debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
+        self.store[y_index * self.x_len + x_index] = item;
+    }
 }
 
-impl ArrayMap<f32> {
+impl Map<f32> {
+    pub fn load_from_tiff(x_len: usize, y_len: usize, file: File) -> Self {
+        let reader = std::io::BufReader::new(file);
+        let mut decoder = Decoder::new(reader).unwrap();
+        let mut data = DecodingResult::F32(vec![]);
+
+        _ = decoder.read_image_to_buffer(&mut data).unwrap();
+
+        let DecodingResult::F32(data) = data else {
+            panic!()
+        };
+
+        Self::from_vec(x_len, y_len, data)
+    }
+
     pub fn save_as_image(&self, white_value: f32, path: &str) {
         self.as_image(white_value).save(path).unwrap();
     }
@@ -80,33 +103,5 @@ impl ArrayMap<f32> {
                 Rgb([value_u8, value_u8, value_u8])
             }
         })
-    }
-}
-
-impl<T: Copy + Default> Map for ArrayMap<T> {
-    type Item = T;
-
-    fn x_len(&self) -> usize {
-        self.x_len
-    }
-
-    fn y_len(&self) -> usize {
-        self.y_len
-    }
-
-    fn len(&self) -> usize {
-        self.store.len()
-    }
-
-    fn get(&self, x_index: usize, y_index: usize) -> T {
-        debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
-        debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
-        self.store[y_index * self.x_len + x_index]
-    }
-
-    fn set(&mut self, x_index: usize, y_index: usize, item: T) {
-        debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
-        debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
-        self.store[y_index * self.x_len + x_index] = item;
     }
 }
