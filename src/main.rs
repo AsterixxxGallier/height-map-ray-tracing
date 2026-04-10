@@ -1,5 +1,4 @@
 use crate::map::{ArrayMap, Map};
-use traversal::pixel::PixelTraversal;
 use crate::ray::{Ray2, Ray3};
 use image::{Rgb, RgbImage};
 use num_traits::Float;
@@ -9,10 +8,12 @@ use std::f64::consts::PI;
 use std::fs::File;
 use std::time::Instant;
 use tiff::decoder::{Decoder, DecodingResult};
+use traversal::pixel::PixelTraversal;
 
 pub mod traversal;
 pub mod map;
 pub mod ray;
+pub mod download;
 
 pub fn is_line_free<M: Map<Item = f32>, T: Float>(map: &M, ray_3: Ray3<T>) -> bool {
     let ray_2 = ray_3.as_ray_2();
@@ -42,7 +43,17 @@ pub fn max_z<M: Map<Item = f32>, T: Float>(map: &M, ray: Ray2<T>) -> Option<f32>
 }
 
 fn main() {
-    let file = File::open("LHD_FXX_0648_6863_MNS_O_0M50_LAMB93_IGN69.tif").unwrap();
+    /*use crate::download::*;
+    let region = Region {
+        x_min: 643,
+        x_max: 652,
+        y_min: 6858,
+        y_max: 6867,
+    };
+    download_tiles("tiles", region);
+    return;*/
+
+    let file = File::open("tiles/LHD_FXX_0648_6862_MNS_O_0M50_LAMB93_IGN69.tif").unwrap();
     let io = std::io::BufReader::new(file);
     let mut reader = Decoder::new(io).unwrap();
 
