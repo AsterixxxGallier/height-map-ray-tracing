@@ -26,21 +26,23 @@ impl PixelSpacePositionAcrossTiles {
         }
     }
 
+    pub fn tile(&self) -> TileCoordinates {
+        TileCoordinates {
+            x: (self.x / 2000.0).floor() as i32,
+            y: (self.y / 2000.0).ceil() as i32,
+        }
+    }
+
+    pub fn position_in(&self, tile: TileCoordinates) -> PositionInTile {
+        PositionInTile {
+            x: (self.x - tile.x as f64 * 2000.0).clamp(0.0, 2000.0),
+            y: (tile.y as f64 * 2000.0 - self.y).clamp(0.0, 2000.0),
+        }
+    }
+
     pub fn split(self) -> (TileCoordinates, PositionInTile) {
-        let tile_x = (self.x / 2000.0).floor();
-        let tile_y = (self.y / 2000.0).ceil();
-        let pixel_x = self.x - tile_x * 2000.0;
-        let pixel_y = tile_y * 2000.0 - self.y;
-
-        let tile_coordinates = TileCoordinates {
-            x: tile_x as i32,
-            y: tile_y as i32,
-        };
-        let position_in_tile = PositionInTile {
-            x: pixel_x,
-            y: pixel_y,
-        };
-
+        let tile_coordinates = self.tile();
+        let position_in_tile = self.position_in(tile_coordinates);
         (tile_coordinates, position_in_tile)
     }
 }
@@ -59,21 +61,23 @@ impl TileSpacePositionAcrossTiles {
         }
     }
 
+    pub fn tile(&self) -> TileCoordinates {
+        TileCoordinates {
+            x: self.x.floor() as i32,
+            y: self.y.ceil() as i32,
+        }
+    }
+
+    pub fn position_in(&self, tile: TileCoordinates) -> PositionInTile {
+        PositionInTile {
+            x: (self.x - tile.x as f64).clamp(0.0, 1.0) * 2000.0,
+            y: (tile.y as f64 - self.y).clamp(0.0, 1.0) * 2000.0,
+        }
+    }
+
     pub fn split(self) -> (TileCoordinates, PositionInTile) {
-        let tile_x = self.x.floor();
-        let tile_y = self.y.ceil();
-        let pixel_x = (self.x - tile_x) * 2000.0;
-        let pixel_y = (tile_y - self.y) * 2000.0;
-
-        let tile_coordinates = TileCoordinates {
-            x: tile_x as i32,
-            y: tile_y as i32,
-        };
-        let position_in_tile = PositionInTile {
-            x: pixel_x,
-            y: pixel_y,
-        };
-
+        let tile_coordinates = self.tile();
+        let position_in_tile = self.position_in(tile_coordinates);
         (tile_coordinates, position_in_tile)
     }
 }
@@ -120,6 +124,30 @@ impl From<ModelSpacePosition> for PixelSpacePositionAcrossTiles {
     }
 }
 
+impl From<TileSpacePositionAcrossTiles> for ModelSpacePosition {
+    fn from(value: TileSpacePositionAcrossTiles) -> Self {
+        let (tile_coordinates, position_within_tile) = value.split();
+        let x_origin = tile_coordinates.x as f64 * 1000.0 - 0.25;
+        let y_origin = tile_coordinates.y as f64 * 1000.0;
+        let x_offset = position_within_tile.x / 2.0;
+        let y_offset = -position_within_tile.y / 2.0;
+
+        ModelSpacePosition {
+            x: x_origin + x_offset,
+            y: y_origin + y_offset,
+        }
+    }
+}
+
+impl From<ModelSpacePosition> for TileSpacePositionAcrossTiles {
+    fn from(value: ModelSpacePosition) -> Self {
+        TileSpacePositionAcrossTiles {
+            x: (value.x + 0.25) / 1000.0,
+            y: value.y / 1000.0,
+        }
+    }
+}
+
 #[cfg(test)]
 #[test]
 fn test() {
@@ -136,5 +164,15 @@ fn test() {
     assert_eq!(
         position_across_tiles,
         PixelSpacePositionAcrossTiles::from(ModelSpacePosition::from(position_across_tiles)),
+    );
+    assert_eq!(
+        TileSpacePositionAcrossTiles::from(position_across_tiles),
+        TileSpacePositionAcrossTiles::from(ModelSpacePosition::from(position_across_tiles)),
+    );
+    assert_eq!(
+        position_across_tiles,
+        PixelSpacePositionAcrossTiles::from(ModelSpacePosition::from(
+            TileSpacePositionAcrossTiles::from(position_across_tiles),
+        )),
     );
 }

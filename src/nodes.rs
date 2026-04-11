@@ -1,16 +1,26 @@
 use std::path::Path;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
+use crate::transform::ModelSpacePosition;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Copy, Clone)]
 pub struct Node {
-    _date: u64,
-    id: u64,
-    x: f64,
-    y: f64,
-    z: f64,
+    pub _date: u64,
+    pub id: u64,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
     #[serde(deserialize_with = "uppercase_bool")]
-    active: bool,
+    pub active: bool,
+}
+
+impl Node {
+    pub fn position(&self) -> ModelSpacePosition {
+        ModelSpacePosition {
+            x: self.x,
+            y: self.y,
+        }
+    }
 }
 
 fn uppercase_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>

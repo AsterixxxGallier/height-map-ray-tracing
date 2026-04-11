@@ -1,15 +1,18 @@
+extern crate core;
+
 use crate::map::Map;
+use crate::nodes::{read_nodes, Node};
 use crate::ray::{Ray2, Ray3};
-use crate::tiles::{TileRegion, Tiles};
+use crate::tiles::{TileCoordinates, TileRegion, Tiles};
+use crate::transform::{ModelSpacePosition, TileSpacePositionAcrossTiles};
 use image::{Rgb, RgbImage};
-use indicatif::ProgressIterator;
+use indicatif::{ParallelProgressIterator, ProgressIterator};
 use num_traits::Float;
-use rayon::iter::ParallelIterator;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
 use std::f64::consts::PI;
 use std::time::Instant;
 use traversal::pixel::PixelTraversal;
-use crate::nodes::read_nodes;
 
 pub mod map;
 pub mod ray;
@@ -42,10 +45,78 @@ pub fn max_z<T: Float>(map: &Map<f32>, ray: Ray2<T>) -> Option<f32> {
         .reduce(|a, b| a.max(b))
 }
 
-fn main() {
-    let _nodes = read_nodes("nodes.csv");
-    return;
+pub fn node_rays(nodes: &[Node]) -> impl Iterator<Item=Ray3<f64>> {
+    nodes.iter().enumerate().flat_map(|(first_node_index, &first_node)| {
+        nodes[..first_node_index].iter().filter_map(move |&second_node| {
+            let first_position: TileSpacePositionAcrossTiles = first_node.position().into();
+            let second_position: TileSpacePositionAcrossTiles = second_node.position().into();
+            Some(Ray3 {
+                start_x: first_position.x,
+                start_y: first_position.y,
+                start_z: first_node.z,
+                diff_x: second_position.x - first_position.x,
+                diff_y: second_position.y - first_position.y,
+                diff_z: second_node.z - first_node.z,
+            })
+        })
+    })
+}
 
+pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
+    let mut tile_traversal = PixelTraversal::new(ray.as_ray_2());
+
+    tile_traversal.all(|tile_segment| {
+        // dbg!(tile_segment);
+        let tile_coordinates = TileCoordinates {
+            x: tile_segment.pixel_x,
+            y: tile_segment.pixel_y + 1,
+        };
+        let sub_ray = ray.sub_ray(tile_segment.start_t, tile_segment.end_t);
+        let sub_ray_start = TileSpacePositionAcrossTiles {
+            x: sub_ray.start_x,
+            y: sub_ray.start_y,
+        };
+        let sub_ray_end = TileSpacePositionAcrossTiles {
+            x: sub_ray.end_x(),
+            y: sub_ray.end_y(),
+        };
+        // dbg!(sub_ray_start);
+        // dbg!(sub_ray_end);
+        let sub_ray_start_position = sub_ray_start.position_in(tile_coordinates);
+        let sub_ray_end_position = sub_ray_end.position_in(tile_coordinates);
+        // dbg!(sub_ray_start_position);
+        // dbg!(sub_ray_end_position);
+        let ray_in_tile = Ray3 {
+            start_x: sub_ray_start_position.x,
+            start_y: sub_ray_start_position.y,
+            start_z: sub_ray.start_z,
+            diff_x: sub_ray_end_position.x - sub_ray_start_position.x,
+            diff_y: sub_ray_end_position.y - sub_ray_start_position.y,
+            diff_z: sub_ray.diff_z,
+        };
+        if let Some(tile) = tiles.tile(tile_coordinates) {
+            is_line_free(tile, ray_in_tile)
+        }else {
+            // println!("ray out of region bounds");
+            // false
+            false
+        }
+        // let tile = tiles.tile(tile_coordinates).unwrap_or_else(|| {
+        //     dbg!(tile_segment);
+        //     dbg!(tile_coordinates);
+        //     dbg!(ray);
+        //     dbg!(sub_ray_start);
+        //     dbg!(sub_ray_end);
+        //     dbg!(sub_ray_start_position);
+        //     dbg!(sub_ray_end_position);
+        //     dbg!(ray_in_tile);
+        //     panic!("tile not found");
+        // });
+        // is_line_free(tile, ray_in_tile)
+    })
+}
+
+fn main() {
     let region = TileRegion {
         x_min: 643,
         x_max: 652,
@@ -54,6 +125,38 @@ fn main() {
     };
     let mut tiles = Tiles::new();
     tiles.load_from_directory(region, "tiles");
+
+    let nodes = read_nodes("nodes.csv");
+    let mut x_min = f64::INFINITY;
+    let mut x_max = f64::NEG_INFINITY;
+    let mut y_min = f64::INFINITY;
+    let mut y_max = f64::NEG_INFINITY;
+    for &node in &nodes {
+        let position = node.position();
+        let position: TileSpacePositionAcrossTiles = position.into();
+        // assert!(position.x >= 642.0, "{node:#?}\n{position:#?}");
+        // assert!(position.x <= 654.0, "{node:#?}\n{position:#?}");
+        // assert!(position.y >= 6857.0, "{node:#?}\n{position:#?}");
+        // assert!(position.y <= 6869.0, "{node:#?}\n{position:#?}");
+        x_min = x_min.min(position.x);
+        x_max = x_max.max(position.x);
+        y_min = y_min.min(position.y);
+        y_max = y_max.max(position.y);
+    }
+    println!("x_min = {x_min:>10.5}");
+    println!("x_max = {x_max:>10.5}");
+    println!("y_min = {y_min:>10.5}");
+    println!("y_max = {y_max:>10.5}");
+
+    let rays = node_rays(&nodes);
+    let ray_count = (nodes.len() * (nodes.len() - 1) / 2) as u64;
+    let free_count = rays.par_bridge().progress_count(ray_count).filter(|&ray| {
+        // println!("ray: {ray:#?}");
+        // println!("is free: {}", is_line_free_across_tiles(&tiles, ray));
+        is_line_free_across_tiles(&tiles, ray)
+    }).count();
+    println!("{:.3}", free_count as f64 / ray_count as f64);
+    return;
 
     for coordinates in region.coordinates().progress_count(100) {
         let x_size = 2000;
