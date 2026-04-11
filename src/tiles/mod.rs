@@ -1,8 +1,12 @@
 use crate::map::Map;
 use crate::tiles::download::download_tiles;
+use crate::transform::{model_to_pixel, pixel_to_model, Coord, CoordinateTransform};
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
+use tiff::decoder::{Decoder, DecodingResult};
+use tiff::tags::Tag;
 
 pub mod download;
 
@@ -51,12 +55,68 @@ impl Tiles {
                 Ok(file) => file,
                 Err(error) => panic!(
                     "could not open file for tile coordinates x={} y={}: {error}",
-                    coordinates.x,
-                    coordinates.y,
+                    coordinates.x, coordinates.y,
                 ),
             };
 
-            let tile = Map::load_from_tiff(2000, 2000, file);
+            let reader = BufReader::new(file);
+            let mut decoder = Decoder::new(reader).unwrap();
+            let mut data = DecodingResult::F32(vec![]);
+
+            _ = decoder.read_image_to_buffer(&mut data).unwrap();
+
+            let DecodingResult::F32(data) = data else {
+                panic!()
+            };
+
+            let pixel_scale_data = decoder
+                .find_tag(Tag::ModelPixelScaleTag)
+                .unwrap()
+                .map(|value| value.into_f64_vec())
+                .transpose()
+                .unwrap();
+            let tie_points_data = decoder
+                .find_tag(Tag::ModelTiepointTag)
+                .unwrap()
+                .map(|value| value.into_f64_vec())
+                .transpose()
+                .unwrap();
+            let model_transformation_data = decoder
+                .find_tag(Tag::ModelTransformationTag)
+                .unwrap()
+                .map(|value| value.into_f64_vec())
+                .transpose()
+                .unwrap();
+
+            let transform = CoordinateTransform::from_tag_data(
+                pixel_scale_data,
+                tie_points_data,
+                model_transformation_data,
+            );
+
+            let transform1 = CoordinateTransform::TiePointAndPixelScale {
+                raster_point: Coord { x: 0.0, y: 0.0 },
+                model_point: Coord {
+                    x: coordinates.x as f64 * 1000.0 - 0.25,
+                    y: coordinates.y as f64 * 1000.0,
+                },
+                pixel_scale: Coord { x: 0.5, y: 0.5 },
+            };
+            let Coord {
+                x: expected_x,
+                y: expected_y,
+            } = transform.transform_to_model(&Coord { x: 1999.0, y: 1999.0 });
+            let (actual_x, actual_y) = pixel_to_model(coordinates, 1999.0, 1999.0);
+            assert_eq!(expected_x, actual_x);
+            assert_eq!(expected_y, actual_y);
+            let (back_coords, back_x, back_y) = model_to_pixel(actual_x, actual_y);
+            assert_eq!(back_coords, coordinates);
+            assert_eq!(back_x, 1999.0);
+            assert_eq!(back_y, 1999.0);
+            assert_eq!(transform, transform1);
+
+            let tile = Map::<f32>::from_vec(2000, 2000, data);
+
             self.tiles.insert(coordinates, tile);
         }
     }

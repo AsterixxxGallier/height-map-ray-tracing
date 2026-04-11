@@ -14,6 +14,7 @@ pub mod map;
 pub mod ray;
 pub mod tiles;
 pub mod traversal;
+pub mod transform;
 
 pub fn is_line_free<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> bool {
     let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
@@ -48,6 +49,8 @@ fn main() {
     };
     let mut tiles = Tiles::new();
     tiles.load_from_directory(region, "tiles");
+
+    return;
 
     for coordinates in region.coordinates().progress_count(100) {
         let x_size = 2000;
