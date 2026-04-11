@@ -50,8 +50,6 @@ fn main() {
     let mut tiles = Tiles::new();
     tiles.load_from_directory(region, "tiles");
 
-    return;
-
     for coordinates in region.coordinates().progress_count(100) {
         let x_size = 2000;
         let y_size = 2000;
