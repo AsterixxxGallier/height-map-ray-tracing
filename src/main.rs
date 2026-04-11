@@ -9,12 +9,14 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
 use std::f64::consts::PI;
 use std::time::Instant;
 use traversal::pixel::PixelTraversal;
+use crate::nodes::read_nodes;
 
 pub mod map;
 pub mod ray;
 pub mod tiles;
 pub mod traversal;
 pub mod transform;
+pub mod nodes;
 
 pub fn is_line_free<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> bool {
     let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
@@ -41,6 +43,9 @@ pub fn max_z<T: Float>(map: &Map<f32>, ray: Ray2<T>) -> Option<f32> {
 }
 
 fn main() {
+    let _nodes = read_nodes("nodes.csv");
+    return;
+
     let region = TileRegion {
         x_min: 643,
         x_max: 652,

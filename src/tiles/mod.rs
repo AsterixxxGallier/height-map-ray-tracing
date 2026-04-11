@@ -43,10 +43,10 @@ impl Tiles {
         }
     }
 
-    pub fn load_from_directory(&mut self, region: TileRegion, directory: &str) {
+    pub fn load_from_directory(&mut self, region: TileRegion, directory: impl AsRef<Path>) {
         for coordinates in region.coordinates() {
             let filename = tile_filename(coordinates);
-            let path = Path::new(directory).join(filename);
+            let path = directory.as_ref().join(filename);
             let file = match File::open(path) {
                 Ok(file) => file,
                 Err(error) => panic!(
@@ -60,8 +60,8 @@ impl Tiles {
         }
     }
 
-    pub fn download_and_load_from_directory(&mut self, region: TileRegion, directory: &str) {
-        download_tiles(directory, region);
+    pub fn download_and_load_from_directory(&mut self, region: TileRegion, directory: impl AsRef<Path>) {
+        download_tiles(&directory, region);
         self.load_from_directory(region, directory);
     }
 

@@ -38,13 +38,13 @@ fn tile_url_and_filename(coordinates: TileCoordinates) -> (String, String) {
     (url, filename)
 }
 
-pub fn download_tile(directory: &str, coordinates: TileCoordinates) {
+pub fn download_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) {
     download_tile_with_client(&mut Client::new(), directory, coordinates);
 }
 
-pub fn download_tile_with_client(client: &Client, directory: &str, coordinates: TileCoordinates) {
+pub fn download_tile_with_client(client: &Client, directory: impl AsRef<Path>, coordinates: TileCoordinates) {
     let (url, filename) = tile_url_and_filename(coordinates);
-    let path = Path::new(directory).join(filename);
+    let path = directory.as_ref().join(filename);
     match File::create_new(path) {
         Ok(mut file) => {
             let mut resp = client.get(url).send().expect("request failed");
@@ -55,9 +55,9 @@ pub fn download_tile_with_client(client: &Client, directory: &str, coordinates: 
     }
 }
 
-pub fn download_tiles(directory: &str, region: TileRegion) {
+pub fn download_tiles(directory: impl AsRef<Path>, region: TileRegion) {
     let client = Client::new();
     for coordinates in region.coordinates() {
-        download_tile_with_client(&client, directory, coordinates);
+        download_tile_with_client(&client, directory.as_ref(), coordinates);
     }
 }
