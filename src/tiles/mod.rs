@@ -1,11 +1,12 @@
 use crate::map::Map;
 use crate::tile::Tile;
-use crate::tiles::download::download_tiles;
+use crate::tiles::download::{download_tile, download_tiles};
 use crate::transform::PixelSpacePositionAcrossTiles;
 use image::{ImageBuffer, Rgb};
 use indicatif::ProgressIterator;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -64,9 +65,16 @@ impl Tiles {
         }
     }
 
-    pub fn discard_tile(&mut self, tile_coordinates: TileCoordinates) {
-        let tile = self.tiles.remove(&tile_coordinates).unwrap();
+    pub fn discard_tile(&mut self, coordinates: TileCoordinates) {
+        let tile = self.tiles.remove(&coordinates).unwrap();
         self.unused_tiles.push(tile);
+    }
+
+    pub fn discard_and_delete_tile(&mut self, coordinates: TileCoordinates) {
+        self.discard_tile(coordinates);
+        let filename = tile_filename(coordinates);
+        let path = self.directory.join(filename);
+        fs::remove_file(path).unwrap();
     }
 
     pub fn load_tile(&mut self, coordinates: TileCoordinates) -> &Tile {
@@ -92,6 +100,11 @@ impl Tiles {
         };
         self.tiles.insert(coordinates, tile);
         self.tiles.get(&coordinates).unwrap()
+    }
+
+    pub fn download_and_load_tile(&mut self, coordinates: TileCoordinates) -> &Tile {
+        download_tile(&self.directory, coordinates);
+        self.load_tile(coordinates)
     }
 
     pub fn load_region(&mut self, region: TileRegion) {

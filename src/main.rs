@@ -73,7 +73,7 @@ fn main() {
 
     for (&tile_coordinates, tile_rays) in tile_rays.iter().progress() {
         // let tile = tiles.tile(tile_coordinates).unwrap();
-        let tile = tiles.load_tile(tile_coordinates);
+        let tile = tiles.download_and_load_tile(tile_coordinates);
         tile_rays.par_iter().for_each(|&(tile_ray, ray_index)| {
             if is_free[ray_index].load(Ordering::Relaxed) == false {
                 // ray already intersects in other tile
