@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 use crate::map::Map;
 use crate::ray::Ray3;
-use crate::intersection_t;
 use num_traits::Float;
 use std::fs;
 use std::path::Path;
+use crate::intersection::intersection_t;
 
 const CHUNK_SIZES: [usize; 3] = [100, 8, 1];
 

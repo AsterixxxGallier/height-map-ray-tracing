@@ -1,61 +1,24 @@
 use crate::curvature::curvature_drop;
-use crate::map::Map;
 use crate::nodes::{read_nodes, Node};
-use crate::ray::{Ray2, Ray3};
-use crate::tiles::{TileCoordinates, TileRegion, Tiles};
+use crate::ray::Ray3;
+use crate::tile_rays::tile_rays_by_tile;
+use crate::tiles::{TileRegion, Tiles};
 use crate::transform::TileSpacePositionAcrossTiles;
 use indicatif::*;
-use num_traits::Float;
 use rayon::prelude::*;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
-use traversal::pixel::PixelTraversal;
 
 pub mod curvature;
+pub mod intersection;
 pub mod map;
 pub mod nodes;
 pub mod ray;
 pub mod tile;
+pub mod tile_rays;
 pub mod tiles;
 pub mod transform;
 pub mod traversal;
-
-pub fn is_line_free<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> bool {
-    let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
-
-    if ray.diff_z >= T::zero() {
-        pixel_traversal.all(|segment| {
-            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray.start_z + segment.start_t * ray.diff_z)
-                    .to_f32()
-                    .unwrap()
-        })
-    } else {
-        pixel_traversal.all(|segment| {
-            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                < (ray.start_z + segment.end_t * ray.diff_z).to_f32().unwrap()
-        })
-    }
-}
-
-pub fn intersection_t<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> Option<T> {
-    let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
-
-    if ray.diff_z >= T::zero() {
-        pixel_traversal.find(|segment| {
-            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                >= (ray.start_z + segment.start_t * ray.diff_z)
-                    .to_f32()
-                    .unwrap()
-        }).map(|segment| segment.start_t)
-    } else {
-        pixel_traversal.find(|segment| {
-            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
-                >= (ray.start_z + segment.end_t * ray.diff_z).to_f32().unwrap()
-        }).map(|segment| segment.start_t)
-    }
-}
 
 pub fn node_rays(nodes: &[Node]) -> impl Iterator<Item = Ray3<f64>> {
     nodes
@@ -75,93 +38,6 @@ pub fn node_rays(nodes: &[Node]) -> impl Iterator<Item = Ray3<f64>> {
                 }
             })
         })
-}
-
-pub fn rays_from(nodes: &[Node], first_node: Node) -> impl Iterator<Item = Ray3<f64>> {
-    nodes.iter().filter_map(move |&second_node| {
-        if second_node.id == first_node.id {
-            return None;
-        }
-        let first_position: TileSpacePositionAcrossTiles = first_node.position().into();
-        let second_position: TileSpacePositionAcrossTiles = second_node.position().into();
-        Some(Ray3 {
-            start_x: first_position.x,
-            start_y: first_position.y,
-            start_z: first_node.z,
-            diff_x: second_position.x - first_position.x,
-            diff_y: second_position.y - first_position.y,
-            diff_z: second_node.z - first_node.z,
-        })
-    })
-}
-
-#[derive(Copy, Clone)]
-pub struct TileRay {
-    pub tile_coordinates: TileCoordinates,
-    pub start_t: f64,
-    pub end_t: f64,
-    // tile-relative pixel space
-    pub ray: Ray2<f64>,
-}
-
-// argument in tile space
-pub fn tile_rays(ray: Ray2<f64>) -> impl Iterator<Item = TileRay> {
-    PixelTraversal::new(ray).map(move |tile_segment| {
-        let tile_coordinates = TileCoordinates {
-            x: tile_segment.pixel_x,
-            y: tile_segment.pixel_y,
-        };
-        let sub_ray = ray.sub_ray(tile_segment.start_t, tile_segment.end_t);
-        let sub_ray_start = TileSpacePositionAcrossTiles {
-            x: sub_ray.start_x,
-            y: sub_ray.start_y,
-        };
-        let sub_ray_end = TileSpacePositionAcrossTiles {
-            x: sub_ray.end_x(),
-            y: sub_ray.end_y(),
-        };
-        let sub_ray_start_position = sub_ray_start.position_in(tile_coordinates);
-        let sub_ray_end_position = sub_ray_end.position_in(tile_coordinates);
-        let ray_in_tile = Ray2 {
-            start_x: sub_ray_start_position.x,
-            start_y: sub_ray_start_position.y,
-            diff_x: sub_ray_end_position.x - sub_ray_start_position.x,
-            diff_y: sub_ray_end_position.y - sub_ray_start_position.y,
-        };
-
-        TileRay {
-            tile_coordinates,
-            start_t: tile_segment.start_t,
-            end_t: tile_segment.end_t,
-            ray: ray_in_tile,
-        }
-    })
-}
-
-pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
-    tile_rays(ray.as_ray_2()).all(|tile_ray| {
-        let ray = tile_ray.ray.with_z(
-            ray.start_z + tile_ray.start_t * ray.diff_z,
-            ray.diff_z * (tile_ray.end_t - tile_ray.start_t),
-        );
-        let tile = tiles.tile(tile_ray.tile_coordinates).unwrap();
-        tile.is_line_free(ray)
-    })
-}
-
-pub fn tile_rays_by_tile(
-    rays: impl ExactSizeIterator<Item = Ray2<f64>>,
-) -> HashMap<TileCoordinates, Vec<(TileRay, usize)>> {
-    let mut tile_rays_by_tile: HashMap<TileCoordinates, Vec<(TileRay, usize)>> = HashMap::new();
-    for (ray_index, ray) in rays.enumerate().progress() {
-        for tile_ray in tile_rays(ray) {
-            tile_rays_by_tile
-                .entry(tile_ray.tile_coordinates)
-                .or_default()
-                .push((tile_ray, ray_index));
-        }
-    }
-    tile_rays_by_tile
 }
 
 #[allow(unreachable_code)]
