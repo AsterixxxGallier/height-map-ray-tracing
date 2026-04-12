@@ -14,6 +14,13 @@ reqwest = { version = "0.13.2", features = ["blocking"] }
 serde = { version = "1.0.228", features = ["derive"] }
 csv = "1.4.0"
 
+[profile.optimized]
+inherits = "release"
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+debug = false
+
 [profile.release]
 debug = true
 
