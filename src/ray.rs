@@ -9,6 +9,17 @@ pub struct Ray2<T> {
     pub diff_y: T,
 }
 
+impl<T: Float> Ray2<T> {
+    pub(crate) fn sub_ray(&self, start_t: T, end_t: T) -> Self {
+        Self {
+            start_x: self.start_x + self.diff_x * start_t,
+            start_y: self.start_y + self.diff_y * start_t,
+            diff_x: self.diff_x * (end_t - start_t),
+            diff_y: self.diff_y * (end_t - start_t),
+        }
+    }
+}
+
 impl<T: Copy + Add<Output=T>> Ray2<T> {
     pub fn end_x(&self) -> T {
         self.start_x + self.diff_x

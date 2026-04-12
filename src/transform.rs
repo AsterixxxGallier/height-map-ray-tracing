@@ -22,21 +22,21 @@ impl PixelSpacePositionAcrossTiles {
     pub fn combine(tile_coordinates: TileCoordinates, position_in_tile: PositionInTile) -> Self {
         Self {
             x: tile_coordinates.x as f64 * 2000.0 + position_in_tile.x,
-            y: tile_coordinates.y as f64 * 2000.0 - position_in_tile.y,
+            y: tile_coordinates.y as f64 * 2000.0 + position_in_tile.y,
         }
     }
 
     pub fn tile(&self) -> TileCoordinates {
         TileCoordinates {
             x: (self.x / 2000.0).floor() as i32,
-            y: (self.y / 2000.0).ceil() as i32,
+            y: (self.y / 2000.0).floor() as i32,
         }
     }
 
     pub fn position_in(&self, tile: TileCoordinates) -> PositionInTile {
         PositionInTile {
             x: (self.x - tile.x as f64 * 2000.0).clamp(0.0, 2000.0),
-            y: (tile.y as f64 * 2000.0 - self.y).clamp(0.0, 2000.0),
+            y: (self.y - tile.y as f64 * 2000.0).clamp(0.0, 2000.0),
         }
     }
 
@@ -57,21 +57,21 @@ impl TileSpacePositionAcrossTiles {
     pub fn combine(tile_coordinates: TileCoordinates, position_in_tile: PositionInTile) -> Self {
         Self {
             x: tile_coordinates.x as f64 + position_in_tile.x / 2000.0,
-            y: tile_coordinates.y as f64 - position_in_tile.y / 2000.0,
+            y: tile_coordinates.y as f64 + position_in_tile.y / 2000.0,
         }
     }
 
     pub fn tile(&self) -> TileCoordinates {
         TileCoordinates {
             x: self.x.floor() as i32,
-            y: self.y.ceil() as i32,
+            y: self.y.floor() as i32,
         }
     }
 
     pub fn position_in(&self, tile: TileCoordinates) -> PositionInTile {
         PositionInTile {
             x: (self.x - tile.x as f64).clamp(0.0, 1.0) * 2000.0,
-            y: (tile.y as f64 - self.y).clamp(0.0, 1.0) * 2000.0,
+            y: (self.y - tile.y as f64).clamp(0.0, 1.0) * 2000.0,
         }
     }
 
@@ -106,7 +106,7 @@ impl From<PixelSpacePositionAcrossTiles> for ModelSpacePosition {
         let x_origin = tile_coordinates.x as f64 * 1000.0 - 0.25;
         let y_origin = tile_coordinates.y as f64 * 1000.0;
         let x_offset = position_within_tile.x / 2.0;
-        let y_offset = -position_within_tile.y / 2.0;
+        let y_offset = position_within_tile.y / 2.0;
 
         ModelSpacePosition {
             x: x_origin + x_offset,
@@ -130,7 +130,7 @@ impl From<TileSpacePositionAcrossTiles> for ModelSpacePosition {
         let x_origin = tile_coordinates.x as f64 * 1000.0 - 0.25;
         let y_origin = tile_coordinates.y as f64 * 1000.0;
         let x_offset = position_within_tile.x / 2.0;
-        let y_offset = -position_within_tile.y / 2.0;
+        let y_offset = position_within_tile.y / 2.0;
 
         ModelSpacePosition {
             x: x_origin + x_offset,

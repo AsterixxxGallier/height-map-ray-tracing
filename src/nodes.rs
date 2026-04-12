@@ -18,7 +18,7 @@ impl Node {
     pub fn position(&self) -> ModelSpacePosition {
         ModelSpacePosition {
             x: self.x,
-            y: self.y,
+            y: self.y + 1000.0,
         }
     }
 }

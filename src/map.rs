@@ -63,13 +63,13 @@ impl<T: Copy + Default> Map<T> {
     pub fn get(&self, x_index: usize, y_index: usize) -> T {
         debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
         debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
-        self.store[y_index * self.x_len + x_index]
+        self.store[(self.y_len - 1 - y_index) * self.x_len + x_index]
     }
 
     pub fn set(&mut self, x_index: usize, y_index: usize, item: T) {
         debug_assert!(x_index < self.x_len, "{x_index} >= {}", self.x_len);
         debug_assert!(y_index < self.y_len, "{y_index} >= {}", self.y_len);
-        self.store[y_index * self.x_len + x_index] = item;
+        self.store[(self.y_len - 1 - y_index) * self.x_len + x_index] = item;
     }
 }
 
@@ -94,7 +94,7 @@ impl Map<f32> {
 
     pub fn as_image(&self, white_value: f32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
         image::RgbImage::from_fn(self.x_len as u32, self.y_len as u32, |x, y| {
-            let value = self.get(x as usize, y as usize);
+            let value = self.get(x as usize, self.y_len - 1 - y as usize);
             if value >= white_value {
                 Rgb([255, 0, 0])
             } else {
