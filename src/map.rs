@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::path::Path;
 use image::{ImageBuffer, Rgb};
 use rand::distr::Distribution;
 use rand::Rng;
@@ -104,7 +105,7 @@ impl Map<f32> {
         Self::from_vec(x_len, y_len, data)
     }
 
-    pub fn save_as_image(&self, white_value: f32, path: &str) {
+    pub fn save_as_image(&self, white_value: f32, path: impl AsRef<Path>) {
         self.as_image(white_value).save(path).unwrap();
     }
 

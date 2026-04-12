@@ -1,38 +1,79 @@
-use crate::is_line_free;
+use std::fmt::Debug;
 use crate::map::Map;
 use crate::ray::Ray3;
+use crate::intersection_t;
 use num_traits::Float;
+use std::fs;
+use std::path::Path;
+
+const CHUNK_SIZES: [usize; 3] = [100, 8, 1];
+
+const _: () = {
+    let mut i = 0;
+    while i < CHUNK_SIZES.len() {
+        assert!(2000usize.is_multiple_of(CHUNK_SIZES[i]));
+        i += 1;
+    }
+};
 
 pub struct Tile {
-    high_res: Map<f32>,
-    low_res: Map<f32>,
+    maps: [Map<f32>; CHUNK_SIZES.len()],
 }
 
 impl Tile {
     pub fn new(map: Map<f32>) -> Self {
         assert_eq!(map.x_len(), 2000);
         assert_eq!(map.y_len(), 2000);
-        let low_res = Map::from_fn(125, 125, |x_index, y_index| {
-            let mut max = f32::NEG_INFINITY;
-            for i in 0..16 {
-                for j in 0..16 {
-                    max = max.max(map.get(x_index * 16 + i, y_index * 16 + j));
+        let maps = CHUNK_SIZES.map(|chunk_size| {
+            Map::from_fn(2000 / chunk_size, 2000 / chunk_size, |x_index, y_index| {
+                let mut max = f32::NEG_INFINITY;
+                for i in 0..chunk_size {
+                    for j in 0..chunk_size {
+                        max = max.max(map.get(x_index * chunk_size + i, y_index * chunk_size + j));
+                    }
                 }
-            }
-            max
+                max
+            })
         });
-        Self {
-            high_res: map,
-            low_res,
-        }
+        Self { maps }
     }
 
     pub fn map(&self) -> &Map<f32> {
-        &self.high_res
+        self.maps.last().unwrap()
     }
 
-    pub fn is_line_free<T: Float>(&self, ray: Ray3<T>) -> bool {
-        is_line_free(&self.low_res, ray.scale_x_y(T::from(1.0 / 16.0).unwrap()))
-            || is_line_free(&self.high_res, ray)
+    pub fn save_as_images(&self, white_value: f32, directory: impl AsRef<Path>) {
+        fs::create_dir_all(directory.as_ref()).unwrap();
+        for (chunk_size, map) in CHUNK_SIZES.into_iter().zip(&self.maps) {
+            let file_name = format!("chunk size {chunk_size}.png");
+            let path = directory.as_ref().join(file_name);
+            map.save_as_image(white_value, path);
+        }
+    }
+
+    pub fn is_line_free<T: Float + Debug>(&self, mut ray: Ray3<T>) -> bool {
+        for (chunk_size, map) in CHUNK_SIZES.into_iter().zip(&self.maps) {
+            let scaled_ray = ray.scale_x_y(T::from(1.0 / chunk_size as f64).unwrap());
+            if let Some(intersection_t) = intersection_t(map, scaled_ray) {
+                ray = ray.sub_ray(intersection_t, T::one());
+                // correct precision errors in sub_ray calculation
+                if ray.end_x() < T::zero() {
+                    ray.diff_x = -ray.start_x;
+                }
+                if ray.end_y() < T::zero() {
+                    ray.diff_y = -ray.start_y;
+                }
+                let max = T::from(2000.0).unwrap();
+                if ray.end_x() > max {
+                    ray.diff_x = max - ray.start_x;
+                }
+                if ray.end_y() > max {
+                    ray.diff_y = max - ray.start_y;
+                }
+            } else {
+                return true;
+            }
+        }
+        false
     }
 }

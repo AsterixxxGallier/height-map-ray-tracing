@@ -39,6 +39,24 @@ pub fn is_line_free<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> bool {
     }
 }
 
+pub fn intersection_t<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> Option<T> {
+    let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
+
+    if ray.diff_z >= T::zero() {
+        pixel_traversal.find(|segment| {
+            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
+                >= (ray.start_z + segment.start_t * ray.diff_z)
+                    .to_f32()
+                    .unwrap()
+        }).map(|segment| segment.start_t)
+    } else {
+        pixel_traversal.find(|segment| {
+            map.get(segment.pixel_x as usize, segment.pixel_y as usize)
+                >= (ray.start_z + segment.end_t * ray.diff_z).to_f32().unwrap()
+        }).map(|segment| segment.start_t)
+    }
+}
+
 pub fn node_rays(nodes: &[Node]) -> impl Iterator<Item = Ray3<f64>> {
     nodes
         .iter()
@@ -132,10 +150,10 @@ pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
 }
 
 pub fn tile_rays_by_tile(
-    rays: impl Iterator<Item = Ray2<f64>>,
+    rays: impl ExactSizeIterator<Item = Ray2<f64>>,
 ) -> HashMap<TileCoordinates, Vec<(TileRay, usize)>> {
     let mut tile_rays_by_tile: HashMap<TileCoordinates, Vec<(TileRay, usize)>> = HashMap::new();
-    for (ray_index, ray) in rays.enumerate() {
+    for (ray_index, ray) in rays.enumerate().progress() {
         for tile_ray in tile_rays(ray) {
             tile_rays_by_tile
                 .entry(tile_ray.tile_coordinates)

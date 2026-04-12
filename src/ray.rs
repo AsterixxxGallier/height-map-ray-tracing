@@ -66,6 +66,19 @@ pub struct Ray3<T> {
     pub diff_z: T,
 }
 
+impl<T: Float> Ray3<T> {
+    pub fn sub_ray(&self, start_t: T, end_t: T) -> Self {
+        Self {
+            start_x: self.start_x + self.diff_x * start_t,
+            start_y: self.start_y + self.diff_y * start_t,
+            start_z: self.start_z + self.diff_z * start_t,
+            diff_x: self.diff_x * (end_t - start_t),
+            diff_y: self.diff_y * (end_t - start_t),
+            diff_z: self.diff_z * (end_t - start_t),
+        }
+    }
+}
+
 impl<T: Copy + Add<Output = T>> Ray3<T> {
     pub fn end_x(&self) -> T {
         self.start_x + self.diff_x
