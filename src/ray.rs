@@ -1,5 +1,5 @@
-use std::ops::Add;
 use num_traits::Float;
+use std::ops::{Add, Mul};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Ray2<T> {
@@ -20,11 +20,11 @@ impl<T: Float> Ray2<T> {
     }
 }
 
-impl<T: Copy + Add<Output=T>> Ray2<T> {
+impl<T: Copy + Add<Output = T>> Ray2<T> {
     pub fn end_x(&self) -> T {
         self.start_x + self.diff_x
     }
-    
+
     pub fn end_y(&self) -> T {
         self.start_y + self.diff_y
     }
@@ -41,6 +41,19 @@ impl<T> Ray2<T> {
             diff_z,
         }
     }
+
+    pub fn scale<U>(self, factor: U) -> Ray2<T::Output>
+    where
+        T: Mul<U>,
+        U: Copy,
+    {
+        Ray2 {
+            start_x: self.start_x * factor,
+            start_y: self.start_y * factor,
+            diff_x: self.diff_x * factor,
+            diff_y: self.diff_y * factor,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -53,7 +66,7 @@ pub struct Ray3<T> {
     pub diff_z: T,
 }
 
-impl<T: Copy + Add<Output=T>> Ray3<T> {
+impl<T: Copy + Add<Output = T>> Ray3<T> {
     pub fn end_x(&self) -> T {
         self.start_x + self.diff_x
     }
@@ -72,6 +85,19 @@ impl<T: Copy + Add<Output=T>> Ray3<T> {
             start_y: self.start_y,
             diff_x: self.diff_x,
             diff_y: self.diff_y,
+        }
+    }
+}
+
+impl<T: Copy + Mul<Output = T>> Ray3<T> {
+    pub fn scale_x_y(self, factor: T) -> Ray3<T> {
+        Ray3 {
+            start_x: self.start_x * factor,
+            start_y: self.start_y * factor,
+            start_z: self.start_z,
+            diff_x: self.diff_x * factor,
+            diff_y: self.diff_y * factor,
+            diff_z: self.diff_z,
         }
     }
 }
