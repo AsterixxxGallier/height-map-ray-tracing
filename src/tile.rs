@@ -1,10 +1,10 @@
-use std::fmt::Debug;
+use crate::intersection::intersection_t;
 use crate::map::Map;
 use crate::ray::Ray3;
 use num_traits::Float;
+use std::fmt::Debug;
 use std::fs;
 use std::path::Path;
-use crate::intersection::intersection_t;
 
 const CHUNK_SIZES: [usize; 3] = [100, 8, 1];
 
@@ -14,6 +14,7 @@ const _: () = {
         assert!(2000usize.is_multiple_of(CHUNK_SIZES[i]));
         i += 1;
     }
+    assert!(CHUNK_SIZES[CHUNK_SIZES.len() - 1] == 1);
 };
 
 /// Optimization structure containing height map data of a single tile. A tile is 2000 by 2000
@@ -22,22 +23,36 @@ pub struct Tile {
     maps: [Map<f32>; CHUNK_SIZES.len()],
 }
 
+fn downsize_map(map: &Map<f32>, chunk_size: usize) -> impl Fn(usize, usize) -> f32 + use<'_> {
+    move |x_index, y_index| {
+        let mut max = f32::NEG_INFINITY;
+        for i in 0..chunk_size {
+            for j in 0..chunk_size {
+                max = max.max(map.get(x_index * chunk_size + i, y_index * chunk_size + j));
+            }
+        }
+        max
+    }
+}
+
 impl Tile {
     pub fn new(map: Map<f32>) -> Self {
         assert_eq!(map.x_len(), 2000);
         assert_eq!(map.y_len(), 2000);
         let maps = CHUNK_SIZES.map(|chunk_size| {
-            Map::from_fn(2000 / chunk_size, 2000 / chunk_size, |x_index, y_index| {
-                let mut max = f32::NEG_INFINITY;
-                for i in 0..chunk_size {
-                    for j in 0..chunk_size {
-                        max = max.max(map.get(x_index * chunk_size + i, y_index * chunk_size + j));
-                    }
-                }
-                max
-            })
+            Map::from_fn(2000 / chunk_size, 2000 / chunk_size, downsize_map(&map, chunk_size))
         });
         Self { maps }
+    }
+
+    pub fn regenerate(&mut self, change_map: impl FnOnce(&mut Map<f32>)) {
+        let (original_map, other_maps) = self.maps.split_last_mut().unwrap();
+        change_map(original_map);
+        for index in 0..(CHUNK_SIZES.len() - 1) {
+            let chunk_size = CHUNK_SIZES[index];
+            let map = &mut other_maps[index];
+            map.regenerate_from_fn(downsize_map(original_map, chunk_size));
+        }
     }
 
     pub fn map(&self) -> &Map<f32> {

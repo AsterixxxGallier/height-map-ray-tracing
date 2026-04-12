@@ -48,8 +48,8 @@ fn main() {
         y_min: 6858,
         y_max: 6867,
     };
-    let mut tiles = Tiles::new();
-    tiles.load_from_directory(region, "tiles");
+    let mut tiles = Tiles::new("tiles");
+    // tiles.load_region(region);
 
     let mut nodes = read_nodes("nodes.csv");
     // filter out out-of-bounds nodes
@@ -72,7 +72,8 @@ fn main() {
     let start = Instant::now();
 
     for (&tile_coordinates, tile_rays) in tile_rays.iter().progress() {
-        let tile = tiles.tile(tile_coordinates).unwrap();
+        // let tile = tiles.tile(tile_coordinates).unwrap();
+        let tile = tiles.load_tile(tile_coordinates);
         tile_rays.par_iter().for_each(|&(tile_ray, ray_index)| {
             if is_free[ray_index].load(Ordering::Relaxed) == false {
                 // ray already intersects in other tile
@@ -96,6 +97,7 @@ fn main() {
                 is_free[ray_index].store(false, Ordering::Relaxed);
             }
         });
+        tiles.discard_tile(tile_coordinates);
     }
 
     let duration = start.elapsed();
@@ -105,18 +107,23 @@ fn main() {
         .count();
     let total_count = is_free.len();
     let whole_ray_count = rays.len();
-    let tile_ray_count = tile_rays_checked.load(Ordering::Relaxed);
+    let checked_tile_ray_count = tile_rays_checked.load(Ordering::Relaxed);
+    let total_tile_ray_count = tile_rays.values().map(|rays| rays.len()).sum::<usize>();
     println!(
         "{:.2}% free ({free_count} of {total_count})",
         free_count as f64 / total_count as f64 * 100.0
     );
     println!(
         "{:.2} tile rays checked per ray",
-        tile_ray_count as f64 / whole_ray_count as f64
+        checked_tile_ray_count as f64 / whole_ray_count as f64
     );
     println!(
         "{:.2} million tile rays checked per second",
-        tile_ray_count as f64 / duration.as_secs_f64() / 1e6
+        checked_tile_ray_count as f64 / duration.as_secs_f64() / 1e6
+    );
+    println!(
+        "{:.2}% of tile rays checked ({checked_tile_ray_count} of {total_tile_ray_count})",
+        checked_tile_ray_count as f64 / total_tile_ray_count as f64 * 100.0
     );
     println!("took {:?}", duration);
 }

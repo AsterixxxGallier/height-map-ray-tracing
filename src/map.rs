@@ -1,8 +1,7 @@
 use std::fs::File;
+use std::mem;
 use std::path::Path;
 use image::{ImageBuffer, Rgb};
-use rand::distr::Distribution;
-use rand::Rng;
 use tiff::decoder::{Decoder, DecodingResult};
 
 /// A two-dimensional array of values.
@@ -16,20 +15,6 @@ pub struct Map<T> {
 impl<T: Copy + Default> Map<T> {
     pub fn new(x_len: usize, y_len: usize) -> Self {
         let store = vec![T::default(); x_len * y_len].into_boxed_slice();
-        Self {
-            store,
-            x_len,
-            y_len,
-        }
-    }
-
-    pub fn random(
-        x_len: usize,
-        y_len: usize,
-        distribution: impl Distribution<T>,
-        rng: &mut impl Rng,
-    ) -> Self {
-        let store: Box<[T]> = distribution.sample_iter(rng).take(x_len * y_len).collect();
         Self {
             store,
             x_len,
@@ -63,6 +48,17 @@ impl<T: Copy + Default> Map<T> {
             }).collect(),
             x_len,
             y_len,
+        }
+    }
+
+    pub fn regenerate_from_fn(
+        &mut self,
+        f: impl Fn(usize, usize) -> T,
+    ) {
+        for x_index in 0..self.x_len {
+            for y_index in 0..self.y_len {
+                self.set(x_index, y_index, f(x_index, y_index));
+            }
         }
     }
 
@@ -104,6 +100,22 @@ impl Map<f32> {
         };
 
         Self::from_vec(x_len, y_len, data)
+    }
+
+    pub fn regenerate_from_tiff(&mut self, file: File) {
+        let reader = std::io::BufReader::new(file);
+        let mut decoder = Decoder::new(reader).unwrap();
+        let mut vec = mem::take(&mut self.store).into_vec();
+        vec.clear();
+        let mut data = DecodingResult::F32(vec);
+
+        _ = decoder.read_image_to_buffer(&mut data).unwrap();
+
+        let DecodingResult::F32(data) = data else {
+            panic!()
+        };
+
+        self.store = data.into_boxed_slice();
     }
 
     pub fn save_as_image(&self, white_value: f32, path: impl AsRef<Path>) {
