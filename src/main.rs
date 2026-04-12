@@ -1,18 +1,18 @@
+use crate::curvature::curvature_drop;
 use crate::map::Map;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::{Ray2, Ray3};
 use crate::tiles::{TileCoordinates, TileRegion, Tiles};
 use crate::transform::TileSpacePositionAcrossTiles;
-use image::{Rgb, RgbImage};
 use indicatif::*;
 use num_traits::Float;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::f64::consts::FRAC_PI_2;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 use traversal::pixel::PixelTraversal;
 
+pub mod curvature;
 pub mod map;
 pub mod nodes;
 pub mod ray;
@@ -148,7 +148,7 @@ pub fn max_z_across_tiles(tiles: &Tiles, ray: Ray2<f64>) -> f32 {
 
 const _EIFFEL_ID: u64 = 55697;
 
-trait _IteratorExtension: Iterator + Sized {
+/*trait _IteratorExtension: Iterator + Sized {
     fn collect_into_vec(self, vec: &mut Vec<Self::Item>) {
         vec.clear();
         vec.extend(self);
@@ -169,7 +169,7 @@ fn _par_float_range(
     (0..steps)
         .into_par_iter()
         .map(move |index| (index as f64 + 0.5) / (steps as f64) * (end - start) + start)
-}
+}*/
 
 pub fn tile_rays_by_tile(
     rays: impl Iterator<Item = Ray2<f64>>,
@@ -208,8 +208,54 @@ fn main() {
             && position.y <= (region.y_max + 1) as f64
     });
 
-    let start_y_steps = 1000;
-    let angle_steps = 1000;
+    let rays = node_rays(&nodes).collect::<Vec<_>>();
+    let tile_rays = tile_rays_by_tile(rays.iter().map(|ray| ray.as_ray_2()));
+    let is_free = rays
+        .iter()
+        .map(|_| AtomicBool::new(true))
+        .collect::<Vec<_>>();
+    let tile_rays_checked = AtomicUsize::new(0);
+    let start = Instant::now();
+
+    for (&tile_coordinates, tile_rays) in tile_rays.iter().progress() {
+        let tile = tiles.tile(tile_coordinates).unwrap();
+        tile_rays.par_iter().for_each(|&(tile_ray, ray_index)| {
+            if is_free[ray_index].load(Ordering::Relaxed) == false {
+                // ray already intersects in other tile
+                return;
+            }
+
+            tile_rays_checked.fetch_add(1, Ordering::Relaxed);
+
+            let whole_ray = &rays[ray_index];
+            // whole_ray coordinates are in tile space, where 1.0 is 1000 m
+            let whole_ray_length_in_meters =
+                (whole_ray.diff_x * whole_ray.diff_x + whole_ray.diff_y * whole_ray.diff_y).sqrt()
+                    * 1_000.0;
+            let mut start_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.start_t;
+            let mut end_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.end_t;
+            start_z -= curvature_drop(tile_ray.start_t, whole_ray_length_in_meters);
+            end_z -= curvature_drop(tile_ray.end_t, whole_ray_length_in_meters);
+            let ray = tile_ray.ray.with_z(start_z, end_z - start_z);
+            let free = is_line_free(tile, ray);
+            if !free {
+                is_free[ray_index].store(false, Ordering::Relaxed);
+            }
+        });
+    }
+
+    let duration = start.elapsed();
+    let free_count = is_free.iter().filter(|free| free.load(Ordering::Relaxed)).count();
+    let total_count = is_free.len();
+    let whole_ray_count = rays.len();
+    let tile_ray_count = tile_rays_checked.load(Ordering::Relaxed);
+    println!("{:.2}% free ({free_count} of {total_count})", free_count as f64 / total_count as f64 * 100.0);
+    println!("{:.2} tile rays checked per ray", tile_ray_count as f64 / whole_ray_count as f64);
+    println!("{:.2} million tile rays checked per second", tile_ray_count as f64 / duration.as_secs_f64() / 1e6);
+    println!("took {:?}", duration);
+
+    /*let start_y_steps = 4000;
+    let angle_steps = 4000;
     let mut image = RgbImage::new(start_y_steps as u32, angle_steps as u32);
     let start = Instant::now();
     #[derive(Copy, Clone)]
@@ -286,5 +332,5 @@ fn main() {
         elapsed,
         num_rays as f64 / elapsed.as_secs_f64() / 1e6,
     );
-    image.save("out_big.png").unwrap();
+    image.save("out_big.png").unwrap();*/
 }
