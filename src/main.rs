@@ -83,10 +83,17 @@ pub fn rays_from(nodes: &[Node], first_node: Node) -> impl Iterator<Item = Ray3<
     })
 }
 
-pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
-    let mut tile_traversal = PixelTraversal::new(ray.as_ray_2());
+pub struct TileRay {
+    pub tile_coordinates: TileCoordinates,
+    pub start_t: f64,
+    pub end_t: f64,
+    // tile-relative pixel space
+    pub ray: Ray2<f64>,
+}
 
-    tile_traversal.all(|tile_segment| {
+// argument in tile space
+pub fn tile_rays(ray: Ray2<f64>) -> impl Iterator<Item = TileRay> {
+    PixelTraversal::new(ray).map(move |tile_segment| {
         let tile_coordinates = TileCoordinates {
             x: tile_segment.pixel_x,
             y: tile_segment.pixel_y,
@@ -102,47 +109,38 @@ pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
         };
         let sub_ray_start_position = sub_ray_start.position_in(tile_coordinates);
         let sub_ray_end_position = sub_ray_end.position_in(tile_coordinates);
-        let ray_in_tile = Ray3 {
+        let ray_in_tile = Ray2 {
             start_x: sub_ray_start_position.x,
             start_y: sub_ray_start_position.y,
-            start_z: sub_ray.start_z,
             diff_x: sub_ray_end_position.x - sub_ray_start_position.x,
             diff_y: sub_ray_end_position.y - sub_ray_start_position.y,
-            diff_z: sub_ray.diff_z,
         };
-        let tile = tiles.tile(tile_coordinates).unwrap();
-        is_line_free(tile, ray_in_tile)
+
+        TileRay {
+            tile_coordinates,
+            start_t: tile_segment.start_t,
+            end_t: tile_segment.end_t,
+            ray: ray_in_tile,
+        }
+    })
+}
+
+pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
+    tile_rays(ray.as_ray_2()).all(|tile_ray| {
+        let ray = tile_ray.ray.with_z(
+            ray.start_z + tile_ray.start_t * ray.diff_z,
+            ray.diff_z * (tile_ray.end_t - tile_ray.start_t),
+        );
+        let tile = tiles.tile(tile_ray.tile_coordinates).unwrap();
+        is_line_free(tile, ray)
     })
 }
 
 pub fn max_z_across_tiles(tiles: &Tiles, ray: Ray2<f64>) -> f32 {
-    let tile_traversal = PixelTraversal::new(ray);
-
-    tile_traversal
-        .map(|tile_segment| {
-            let tile_coordinates = TileCoordinates {
-                x: tile_segment.pixel_x,
-                y: tile_segment.pixel_y,
-            };
-            let sub_ray = ray.sub_ray(tile_segment.start_t, tile_segment.end_t);
-            let sub_ray_start = TileSpacePositionAcrossTiles {
-                x: sub_ray.start_x,
-                y: sub_ray.start_y,
-            };
-            let sub_ray_end = TileSpacePositionAcrossTiles {
-                x: sub_ray.end_x(),
-                y: sub_ray.end_y(),
-            };
-            let sub_ray_start_position = sub_ray_start.position_in(tile_coordinates);
-            let sub_ray_end_position = sub_ray_end.position_in(tile_coordinates);
-            let ray_in_tile = Ray2 {
-                start_x: sub_ray_start_position.x,
-                start_y: sub_ray_start_position.y,
-                diff_x: sub_ray_end_position.x - sub_ray_start_position.x,
-                diff_y: sub_ray_end_position.y - sub_ray_start_position.y,
-            };
-            let tile = tiles.tile(tile_coordinates).unwrap();
-            max_z(tile, ray_in_tile).unwrap()
+    tile_rays(ray)
+        .map(|tile_ray| {
+            let tile = tiles.tile(tile_ray.tile_coordinates).unwrap();
+            max_z(tile, tile_ray.ray).unwrap()
         })
         .reduce(|a, b| a.max(b))
         .unwrap()

@@ -16,7 +16,6 @@ csv = "1.4.0"
 
 [profile.release]
 debug = true
-lto = true
 
 [profile.dev]
 opt-level = 1
