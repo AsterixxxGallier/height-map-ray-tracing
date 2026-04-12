@@ -7,6 +7,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
+use crate::tile::Tile;
 
 pub mod download;
 
@@ -44,7 +45,7 @@ impl TileRegion {
 }
 
 pub struct Tiles {
-    tiles: HashMap<TileCoordinates, Map<f32>>,
+    tiles: HashMap<TileCoordinates, Tile>,
 }
 
 fn tile_filename(coordinates: TileCoordinates) -> String {
@@ -75,7 +76,7 @@ impl Tiles {
             };
 
             let tile = Map::<f32>::load_from_tiff(2000, 2000, file);
-            self.tiles.insert(coordinates, tile);
+            self.tiles.insert(coordinates, Tile::new(tile));
         }
     }
 
@@ -88,7 +89,7 @@ impl Tiles {
         self.load_from_directory(region, directory);
     }
 
-    pub fn tile(&self, coordinates: TileCoordinates) -> Option<&Map<f32>> {
+    pub fn tile(&self, coordinates: TileCoordinates) -> Option<&Tile> {
         self.tiles.get(&coordinates)
     }
 
@@ -103,7 +104,7 @@ impl Tiles {
             };
             let (tile_coordinates, position_in_tile) = position.split();
             if let Some(tile) = self.tile(tile_coordinates) {
-                let value = tile.get(position_in_tile.x as usize, position_in_tile.y as usize);
+                let value = tile.map().get(position_in_tile.x as usize, position_in_tile.y as usize);
                 if value >= white_value {
                     Rgb([255, 0, 0])
                 } else {
@@ -141,7 +142,7 @@ impl Tiles {
                 ])
             } else {
                 if let Some(tile) = self.tile(tile_coordinates) {
-                    let value = tile.get(position_in_tile.x as usize, position_in_tile.y as usize);
+                    let value = tile.map().get(position_in_tile.x as usize, position_in_tile.y as usize);
                     if value >= white_value {
                         Rgb([255, 0, 0])
                     } else {

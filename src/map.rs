@@ -48,6 +48,22 @@ impl<T: Copy + Default> Map<T> {
         }
     }
 
+    pub fn from_fn(
+        x_len: usize,
+        y_len: usize,
+        f: impl Fn(usize, usize) -> T,
+    ) -> Self {
+        Self {
+            store: (0..x_len * y_len).map(|index| {
+                let x_index = index % x_len;
+                let y_index = y_len - 1 - index / x_len;
+                f(x_index, y_index)
+            }).collect(),
+            x_len,
+            y_len,
+        }
+    }
+
     pub fn x_len(&self) -> usize {
         self.x_len
     }

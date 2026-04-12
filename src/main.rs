@@ -16,6 +16,7 @@ pub mod curvature;
 pub mod map;
 pub mod nodes;
 pub mod ray;
+pub mod tile;
 pub mod tiles;
 pub mod transform;
 pub mod traversal;
@@ -36,12 +37,6 @@ pub fn is_line_free<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> bool {
                 < (ray.start_z + segment.end_t * ray.diff_z).to_f32().unwrap()
         })
     }
-}
-
-pub fn max_z<T: Float>(map: &Map<f32>, ray: Ray2<T>) -> Option<f32> {
-    PixelTraversal::new(ray)
-        .map(|segment| map.get(segment.pixel_x as usize, segment.pixel_y as usize))
-        .reduce(|a, b| a.max(b))
 }
 
 pub fn node_rays(nodes: &[Node]) -> impl Iterator<Item = Ray3<f64>> {
@@ -132,44 +127,9 @@ pub fn is_line_free_across_tiles(tiles: &Tiles, ray: Ray3<f64>) -> bool {
             ray.diff_z * (tile_ray.end_t - tile_ray.start_t),
         );
         let tile = tiles.tile(tile_ray.tile_coordinates).unwrap();
-        is_line_free(tile, ray)
+        tile.is_line_free(ray)
     })
 }
-
-pub fn max_z_across_tiles(tiles: &Tiles, ray: Ray2<f64>) -> f32 {
-    tile_rays(ray)
-        .map(|tile_ray| {
-            let tile = tiles.tile(tile_ray.tile_coordinates).unwrap();
-            max_z(tile, tile_ray.ray).unwrap()
-        })
-        .reduce(|a, b| a.max(b))
-        .unwrap()
-}
-
-const _EIFFEL_ID: u64 = 55697;
-
-/*trait _IteratorExtension: Iterator + Sized {
-    fn collect_into_vec(self, vec: &mut Vec<Self::Item>) {
-        vec.clear();
-        vec.extend(self);
-    }
-}
-
-impl<I: Iterator> _IteratorExtension for I {}
-
-fn float_range(start: f64, end: f64, steps: usize) -> impl ExactSizeIterator<Item = f64> {
-    (0..steps).map(move |index| (index as f64 + 0.5) / (steps as f64) * (end - start) + start)
-}
-
-fn _par_float_range(
-    start: f64,
-    end: f64,
-    steps: usize,
-) -> impl IndexedParallelIterator<Item = f64> {
-    (0..steps)
-        .into_par_iter()
-        .map(move |index| (index as f64 + 0.5) / (steps as f64) * (end - start) + start)
-}*/
 
 pub fn tile_rays_by_tile(
     rays: impl Iterator<Item = Ray2<f64>>,
@@ -237,7 +197,7 @@ fn main() {
             start_z -= curvature_drop(tile_ray.start_t, whole_ray_length_in_meters);
             end_z -= curvature_drop(tile_ray.end_t, whole_ray_length_in_meters);
             let ray = tile_ray.ray.with_z(start_z, end_z - start_z);
-            let free = is_line_free(tile, ray);
+            let free = tile.is_line_free(ray);
             if !free {
                 is_free[ray_index].store(false, Ordering::Relaxed);
             }
@@ -245,92 +205,24 @@ fn main() {
     }
 
     let duration = start.elapsed();
-    let free_count = is_free.iter().filter(|free| free.load(Ordering::Relaxed)).count();
+    let free_count = is_free
+        .iter()
+        .filter(|free| free.load(Ordering::Relaxed))
+        .count();
     let total_count = is_free.len();
     let whole_ray_count = rays.len();
     let tile_ray_count = tile_rays_checked.load(Ordering::Relaxed);
-    println!("{:.2}% free ({free_count} of {total_count})", free_count as f64 / total_count as f64 * 100.0);
-    println!("{:.2} tile rays checked per ray", tile_ray_count as f64 / whole_ray_count as f64);
-    println!("{:.2} million tile rays checked per second", tile_ray_count as f64 / duration.as_secs_f64() / 1e6);
-    println!("took {:?}", duration);
-
-    /*let start_y_steps = 4000;
-    let angle_steps = 4000;
-    let mut image = RgbImage::new(start_y_steps as u32, angle_steps as u32);
-    let start = Instant::now();
-    #[derive(Copy, Clone)]
-    struct RayInfo {
-        start_y_index: usize,
-        angle_index: usize,
-        ray: Ray2<f64>,
-    }
-    let rays: Vec<_> = float_range(0.0, 10.0, start_y_steps)
-        .enumerate()
-        .flat_map(|(start_y_index, start_y)| {
-            float_range(-FRAC_PI_2, FRAC_PI_2, angle_steps)
-                .enumerate()
-                .map(move |(angle_index, angle)| {
-                    let slope = angle.tan();
-                    let mut ray = Ray2 {
-                        start_x: 0.0,
-                        start_y,
-                        diff_x: 10.0,
-                        diff_y: 10.0 * slope,
-                    };
-                    if ray.end_y() < 0.0 {
-                        let dist_y = start_y;
-                        ray.diff_x = (-dist_y / slope).clamp(0.0, 10.0);
-                        ray.diff_y = -dist_y;
-                    } else if ray.end_y() > 10.0 {
-                        let dist_y = 10.0 - start_y;
-                        ray.diff_x = (dist_y / slope).clamp(0.0, 10.0);
-                        ray.diff_y = dist_y;
-                    }
-                    ray.start_x += region.x_min as f64;
-                    ray.start_y += region.y_min as f64;
-                    RayInfo {
-                        start_y_index,
-                        angle_index,
-                        ray,
-                    }
-                })
-        })
-        .collect();
-    let tile_rays = tile_rays_by_tile(rays.iter().map(|info| info.ray));
-    let results = rays
-        .iter()
-        .map(|_| AtomicU32::default())
-        .collect::<Vec<_>>();
-    tile_rays
-        .iter()
-        .progress()
-        .for_each(|(&tile_coordinates, tile_rays)| {
-            let tile = tiles.tile(tile_coordinates).unwrap();
-            tile_rays.par_iter().for_each(|&(tile_ray, index)| {
-                let result = max_z(tile, tile_ray.ray).unwrap();
-                let result = result.to_bits();
-                results[index].fetch_max(result, Ordering::Relaxed);
-            });
-        });
-    for (ray_info, result) in rays.iter().zip(results) {
-        let max_z = f32::from_bits(result.load(Ordering::Relaxed));
-        let value = (max_z / 200.0 * 255.0).min(255.0) as u8;
-        let value = Rgb([value, value, value]);
-        image.put_pixel(
-            ray_info.start_y_index as u32,
-            ray_info.angle_index as u32,
-            value,
-        );
-    }
-
-    let elapsed = start.elapsed();
-    // let num_rays = image.width() * image.height();
-    let num_rays = tile_rays.values().map(|rays| rays.len()).sum::<usize>();
     println!(
-        "{} rays computed in {:?} ({:.2} million rays per second)",
-        num_rays,
-        elapsed,
-        num_rays as f64 / elapsed.as_secs_f64() / 1e6,
+        "{:.2}% free ({free_count} of {total_count})",
+        free_count as f64 / total_count as f64 * 100.0
     );
-    image.save("out_big.png").unwrap();*/
+    println!(
+        "{:.2} tile rays checked per ray",
+        tile_ray_count as f64 / whole_ray_count as f64
+    );
+    println!(
+        "{:.2} million tile rays checked per second",
+        tile_ray_count as f64 / duration.as_secs_f64() / 1e6
+    );
+    println!("took {:?}", duration);
 }
