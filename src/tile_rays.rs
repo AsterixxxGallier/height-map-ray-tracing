@@ -5,16 +5,18 @@ use crate::tiles::TileCoordinates;
 use crate::transform::TileSpacePositionAcrossTiles;
 use crate::traversal::pixel::PixelTraversal;
 
+/// A segment of a ray that is entirely contained within one tile.
 #[derive(Copy, Clone)]
 pub struct TileRay {
     pub tile_coordinates: TileCoordinates,
     pub start_t: f64,
     pub end_t: f64,
-    // tile-relative pixel space
+    /// The sub-ray in pixel-space coordinates relative to `tile_coordinates`.
     pub ray: Ray2<f64>,
 }
 
-// argument in tile space
+/// Decomposes `ray` into an iterator of [`TileRay`]s. `ray` is assumed to be in tile space
+/// coordinates.
 pub fn tile_rays(ray: Ray2<f64>) -> impl Iterator<Item = TileRay> {
     PixelTraversal::new(ray).map(move |tile_segment| {
         let tile_coordinates = TileCoordinates {
@@ -48,6 +50,8 @@ pub fn tile_rays(ray: Ray2<f64>) -> impl Iterator<Item = TileRay> {
     })
 }
 
+/// Decomposes `rays` into [`TileRay`]s and collects these in a `HashMap`, grouped by their tile
+/// coordinates.
 pub fn tile_rays_by_tile(
     rays: impl ExactSizeIterator<Item = Ray2<f64>>,
 ) -> HashMap<TileCoordinates, Vec<(TileRay, usize)>> {

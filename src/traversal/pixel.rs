@@ -2,6 +2,15 @@ use num_traits::Float;
 use crate::ray::Ray2;
 use crate::traversal::boundary::BoundaryTraversal;
 
+/// An iterator over the segments delimited by pixel boundaries of a ray; including the initial
+/// and final segments of the ray, which are delimited by the ray start/end on one end and a pixel
+/// boundary on the other.
+///
+/// A [`PixelSegment`] is only produced if the ray actually "spends some time" in the pixel.
+/// Touching a pixel is not enough. This means that the `start_t` and `end_t` values of the produced
+/// `PixelSegment`s are guaranteed to be distinct, barring rounding errors.
+/// 
+/// Based on [`BoundaryTraversal`].
 #[derive(Debug)]
 pub struct PixelTraversal<T> {
     boundary_traversal: BoundaryTraversal<T>,

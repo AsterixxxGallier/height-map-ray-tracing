@@ -1,17 +1,21 @@
 use crate::tiles::TileCoordinates;
 
+/// Pixel-space coordinates relative to a tile. `x` and `y` should be between `0.0` and `2000.0`,
+/// inclusive.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PositionInTile {
     pub x: f64,
     pub y: f64,
 }
 
+/// Global model-space coordinates (Lambert-93).
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ModelSpacePosition {
     pub x: f64,
     pub y: f64,
 }
 
+/// Global pixel-space coordinates. In pixel space, a tile is 2000.0 by 2000.0.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PixelSpacePositionAcrossTiles {
     pub x: f64,
@@ -47,6 +51,7 @@ impl PixelSpacePositionAcrossTiles {
     }
 }
 
+/// Global tile-space coordinates. In tile space, a tile is exactly 1.0 by 1.0.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TileSpacePositionAcrossTiles {
     pub x: f64,

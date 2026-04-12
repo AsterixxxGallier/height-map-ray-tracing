@@ -5,6 +5,7 @@ use rand::distr::Distribution;
 use rand::Rng;
 use tiff::decoder::{Decoder, DecodingResult};
 
+/// A two-dimensional array of values.
 #[derive(Debug)]
 pub struct Map<T> {
     store: Box<[T]>,

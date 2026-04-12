@@ -3,6 +3,7 @@ use crate::ray::Ray3;
 use crate::traversal::pixel::PixelTraversal;
 use num_traits::Float;
 
+/// Computes the first t-value at which `ray` intersects `map`.
 pub fn intersection_t<T: Float>(map: &Map<f32>, ray: Ray3<T>) -> Option<T> {
     let mut pixel_traversal = PixelTraversal::new(ray.as_ray_2());
 

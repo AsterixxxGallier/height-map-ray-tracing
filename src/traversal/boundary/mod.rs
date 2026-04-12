@@ -6,6 +6,13 @@ mod core;
 #[cfg(test)]
 mod tests;
 
+/// Boundary types characterized by which coordinate integer parts change value.
+///
+/// For example, a ray crossing an x-boundary means that the integer part of its x coordinate
+/// changed in value (e.g. from `0.99` to `1.01`).
+///
+/// `BoundaryType::XY` signals that the integer parts of both the x and y coordinates changed
+/// simultaneously, i.e. a corner was crossed.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BoundaryType {
     X,
@@ -13,6 +20,17 @@ pub enum BoundaryType {
     XY,
 }
 
+/// An iterator over the boundaries crossed by a given [ray](Ray2). A boundary is considered crossed
+/// if the ray is on both sides of the boundary - merely touching the boundary does not suffice.
+///
+/// The iteration stops when `t` logically reaches or exceeds `1.0`. Precautions have been taken in
+/// the implementation of the iterator to guarantee that floating-point rounding errors can never
+/// result in the ray "over-" or "undershooting". Even when reported values of `t` exceed `1.0`, or
+/// incorrectly never reach `1.0`, the boundary crossings produced are correct in
+/// [type](BoundaryType), order, number and pixel coordinates.
+///
+/// The underlying algorithm is based on the paper "A Fast Voxel Traversal Algorithm" by Amanatides
+/// and Woo, but modified for precision and to account for edge-cases.
 #[derive(Debug)]
 pub struct BoundaryTraversal<T> {
     v: BoundaryTraversalVariables<T>,
@@ -41,6 +59,11 @@ impl<T: Float> BoundaryTraversal<T> {
     }
 }
 
+/// The event of a ray crossing a boundary, characterized by the [type](BoundaryType) of the crossed
+/// boundary, the `t`-value at the crossing, and the coordinates of the pixel that was entered.
+///
+/// `t` may be imprecise due to floating-point rounding errors, which linearly accumulate over the
+/// course of the iteration.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BoundaryCrossing<T> {
     pub boundary_type: BoundaryType,

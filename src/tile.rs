@@ -16,6 +16,8 @@ const _: () = {
     }
 };
 
+/// Optimization structure containing height map data of a single tile. A tile is 2000 by 2000
+/// pixels, corresponding to 1000 by 1000 meters.
 pub struct Tile {
     maps: [Map<f32>; CHUNK_SIZES.len()],
 }

@@ -116,43 +116,4 @@ impl Tiles {
             }
         })
     }
-
-    pub fn as_debug_image(
-        &self,
-        region: TileRegion,
-        white_value: f32,
-    ) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-        let x_tile_count = region.x_max - region.x_min + 1;
-        let y_tile_count = region.y_max - region.y_min + 1;
-        let width = (x_tile_count * 2000) as u32;
-        let height = (y_tile_count * 2000) as u32;
-        image::RgbImage::from_fn(width, height, |x, y| {
-            let y = height - 1 - y;
-            let position = PixelSpacePositionAcrossTiles {
-                x: (region.x_min * 2000 + x as i32) as f64,
-                y: (region.y_min * 2000 + y as i32) as f64,
-            };
-            let (tile_coordinates, position_in_tile) = position.split();
-            if x % 200 < 40 && y % 200 < 40 {
-                // Rgb([200, (x * 255 / width) as u8, (y * 255 / height) as u8])
-                Rgb([
-                    200,
-                    ((tile_coordinates.x - region.x_min) * 255 / x_tile_count) as u8,
-                    ((tile_coordinates.y - region.y_min) * 255 / y_tile_count) as u8,
-                ])
-            } else {
-                if let Some(tile) = self.tile(tile_coordinates) {
-                    let value = tile.map().get(position_in_tile.x as usize, position_in_tile.y as usize);
-                    if value >= white_value {
-                        Rgb([255, 0, 0])
-                    } else {
-                        let value_u8 = ((value / white_value).clamp(0.0, 1.0) * 255.0) as u8;
-                        Rgb([value_u8, value_u8, value_u8])
-                    }
-                } else {
-                    Rgb([255, 0, 255])
-                }
-            }
-        })
-    }
 }
