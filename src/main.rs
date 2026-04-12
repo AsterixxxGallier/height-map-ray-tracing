@@ -1,5 +1,3 @@
-extern crate core;
-
 use crate::map::Map;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::{Ray2, Ray3};
@@ -8,9 +6,11 @@ use crate::transform::TileSpacePositionAcrossTiles;
 use image::{Rgb, RgbImage};
 use indicatif::ProgressIterator;
 use num_traits::Float;
-use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator};
-use std::f64::consts::PI;
+use std::collections::HashMap;
+use std::f64::consts::{FRAC_PI_2, PI};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Instant;
 use traversal::pixel::PixelTraversal;
 
@@ -157,6 +157,16 @@ trait _IteratorExtension: Iterator + Sized {
 
 impl<I: Iterator> _IteratorExtension for I {}
 
+fn float_range(start: f64, end: f64, steps: usize) -> impl ExactSizeIterator<Item = f64> {
+    (0..steps).map(move |index| (index as f64 + 0.5) / (steps as f64) * (end - start) + start)
+}
+
+fn _par_float_range(start: f64, end: f64, steps: usize) -> impl IndexedParallelIterator<Item = f64> {
+    (0..steps)
+        .into_par_iter()
+        .map(move |index| (index as f64 + 0.5) / (steps as f64) * (end - start) + start)
+}
+
 #[allow(unreachable_code)]
 fn main() {
     let region = TileRegion {
@@ -267,18 +277,87 @@ fn main() {
     dbg!(start.elapsed());
     return;*/
 
-    let mut image = RgbImage::new(2000, 1999);
-    let mut values = Vec::with_capacity(2000 * 1999);
+    let start_y_steps = 4000;
+    let angle_steps = 4000;
+    let mut image = RgbImage::new(start_y_steps as u32, angle_steps as u32);
+    // let mut values = Vec::with_capacity(angle_steps);
     let start = Instant::now();
-    let progress_bar = indicatif::ProgressBar::new(2000);
-    for start_y_index in 0..2_000 {
-        let start_y = (start_y_index as f64 + 0.5) / 2_000.0 * 10.0;
-        // dbg!(start_y);
-        progress_bar.inc(1);
-        (1..2000)
-            .into_par_iter()
-            .map(|angle_index| {
-                let angle = (angle_index as f64 / 2000.0 - 0.5) * PI;
+    #[derive(Copy, Clone)]
+    struct RayInfo {
+        start_y_index: usize,
+        angle_index: usize,
+        ray: Ray2<f64>,
+    }
+    let rays: Vec<_> = float_range(0.0, 10.0, start_y_steps)
+        .enumerate()
+        .flat_map(|(start_y_index, start_y)| {
+            float_range(-FRAC_PI_2, FRAC_PI_2, angle_steps)
+                .enumerate()
+                .map(move |(angle_index, angle)| {
+                    let slope = angle.tan();
+                    let mut ray = Ray2 {
+                        start_x: 0.0,
+                        start_y,
+                        diff_x: 10.0,
+                        diff_y: 10.0 * slope,
+                    };
+                    if ray.end_y() < 0.0 {
+                        let dist_y = start_y;
+                        ray.diff_x = (-dist_y / slope).clamp(0.0, 10.0);
+                        ray.diff_y = -dist_y;
+                    } else if ray.end_y() > 10.0 {
+                        let dist_y = 10.0 - start_y;
+                        ray.diff_x = (dist_y / slope).clamp(0.0, 10.0);
+                        ray.diff_y = dist_y;
+                    }
+                    ray.start_x += region.x_min as f64;
+                    ray.start_y += region.y_min as f64;
+                    RayInfo {
+                        start_y_index,
+                        angle_index,
+                        ray,
+                    }
+                })
+        })
+        .collect();
+    let mut tile_rays: HashMap<TileCoordinates, Vec<(Ray2<f64>, usize)>> =
+        HashMap::with_capacity(region.area());
+    for (ray_index, ray_info) in rays.iter().enumerate() {
+        for tile_ray in self::tile_rays(ray_info.ray) {
+            tile_rays
+                .entry(tile_ray.tile_coordinates)
+                .or_default()
+                .push((tile_ray.ray, ray_index));
+        }
+    }
+    let results = rays
+        .iter()
+        .map(|_| AtomicU32::default())
+        .collect::<Vec<_>>();
+    region.coordinates().progress_count(region.area() as u64).for_each(|tile_coordinates| {
+        if let Some(tile_rays) = tile_rays.get(&tile_coordinates) {
+            let tile = tiles.tile(tile_coordinates).unwrap();
+            // dbg!(tile_rays.len());
+            tile_rays.par_iter().for_each(|&(tile_ray, index)| {
+                let result = max_z(tile, tile_ray).unwrap();
+                let result = result.to_bits();
+                results[index].fetch_max(result, Ordering::Relaxed);
+            });
+        }
+    });
+    for (ray_info, result) in rays.iter().zip(results).progress_count(rays.len() as u64) {
+        let max_z = f32::from_bits(result.load(Ordering::Relaxed));
+        let value = (max_z / 200.0 * 255.0).min(255.0) as u8;
+        let value = Rgb([value, value, value]);
+        image.put_pixel(
+            ray_info.start_y_index as u32,
+            ray_info.angle_index as u32,
+            value,
+        );
+    }
+    /*for (start_y_index, start_y) in float_range(0.0, 10.0, start_y_steps).progress().enumerate() {
+        par_float_range(-FRAC_PI_2, FRAC_PI_2, angle_steps)
+            .map(|angle| {
                 let slope = angle.tan();
                 let mut ray = Ray2 {
                     start_x: 0.0,
@@ -305,11 +384,11 @@ fn main() {
             let value = Rgb([value, value, value]);
             image.put_pixel(start_y_index as u32, index as u32, value);
         }
-    }
-    progress_bar.finish_and_clear();
+    }*/
 
     let elapsed = start.elapsed();
-    let num_rays = image.width() * image.height();
+    // let num_rays = image.width() * image.height();
+    let num_rays = tile_rays.values().map(|rays| rays.len()).sum::<usize>();
     println!(
         "{} rays computed in {:?} ({:.2} million rays per second)",
         num_rays,

@@ -2,10 +2,11 @@ use crate::map::Map;
 use crate::tiles::download::download_tiles;
 use crate::transform::PixelSpacePositionAcrossTiles;
 use image::{ImageBuffer, Rgb};
+use indicatif::ProgressIterator;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
-use indicatif::ProgressIterator;
 
 pub mod download;
 
@@ -24,9 +25,21 @@ pub struct TileRegion {
 }
 
 impl TileRegion {
+    pub fn area(&self) -> usize {
+        ((self.x_max - self.x_min + 1) * (self.y_max - self.y_min + 1)) as usize
+    }
+
     pub fn coordinates(&self) -> impl Iterator<Item = TileCoordinates> {
         (self.x_min..=self.x_max)
             .flat_map(|x| (self.y_min..=self.y_max).map(move |y| TileCoordinates { x, y }))
+    }
+
+    pub fn par_coordinates(&self) -> impl ParallelIterator<Item = TileCoordinates> {
+        (self.x_min..=self.x_max).into_par_iter().flat_map(|x| {
+            (self.y_min..=self.y_max)
+                .into_par_iter()
+                .map(move |y| TileCoordinates { x, y })
+        })
     }
 }
 
@@ -47,7 +60,10 @@ impl Tiles {
     }
 
     pub fn load_from_directory(&mut self, region: TileRegion, directory: impl AsRef<Path>) {
-        for coordinates in region.coordinates().progress_count(region.coordinates().count() as u64) {
+        for coordinates in region
+            .coordinates()
+            .progress_count(region.coordinates().count() as u64)
+        {
             let filename = tile_filename(coordinates);
             let path = directory.as_ref().join(filename);
             let file = match File::open(path) {
