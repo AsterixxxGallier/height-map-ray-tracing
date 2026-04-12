@@ -16,18 +16,19 @@ pub enum BoundaryType {
 #[derive(Debug)]
 pub struct BoundaryTraversal<T> {
     v: BoundaryTraversalVariables<T>,
-    remaining_crossings: usize,
+    remaining_x_crossings: usize,
+    remaining_y_crossings: usize,
 }
 
 impl<T: Float> BoundaryTraversal<T> {
     pub fn new(ray: Ray2<T>) -> Self {
         let x_crossings = integers_between(ray.start_x, ray.end_x());
         let y_crossings = integers_between(ray.start_y, ray.end_y());
-        let total_crossings = x_crossings + y_crossings;
 
         Self {
             v: BoundaryTraversalVariables::new(ray),
-            remaining_crossings: total_crossings,
+            remaining_x_crossings: x_crossings,
+            remaining_y_crossings: y_crossings,
         }
     }
 
@@ -58,15 +59,16 @@ impl<T: Float> Iterator for BoundaryTraversal<T> {
 
         match boundary_type {
             BoundaryType::X => {
-                self.remaining_crossings = self.remaining_crossings.checked_sub(1)?;
+                self.remaining_x_crossings = self.remaining_x_crossings.checked_sub(1)?;
                 self.v.step_x();
             }
             BoundaryType::Y => {
-                self.remaining_crossings = self.remaining_crossings.checked_sub(1)?;
+                self.remaining_y_crossings = self.remaining_y_crossings.checked_sub(1)?;
                 self.v.step_y();
             }
             BoundaryType::XY => {
-                self.remaining_crossings = self.remaining_crossings.checked_sub(2)?;
+                self.remaining_x_crossings = self.remaining_x_crossings.checked_sub(1)?;
+                self.remaining_y_crossings = self.remaining_y_crossings.checked_sub(1)?;
                 self.v.step_x();
                 self.v.step_y();
             }

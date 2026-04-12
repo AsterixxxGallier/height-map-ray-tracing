@@ -2,6 +2,7 @@ use num_traits::Float;
 use crate::ray::Ray2;
 use crate::traversal::boundary::BoundaryTraversal;
 
+#[derive(Debug)]
 pub struct PixelTraversal<T> {
     boundary_traversal: BoundaryTraversal<T>,
     last_t: T,

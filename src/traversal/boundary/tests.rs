@@ -1,6 +1,39 @@
 use super::*;
 use crate::ray::Ray2;
 
+/*
+
+[src\main.rs:47:17] ray = Ray2 {
+    start_x: 0.0,
+    start_y: 165.00000000087311,
+    diff_x: 1835.0000000000364,
+    diff_y: 1834.9999999991269,
+}
+[src\main.rs:48:17] ray.end_x() = 1835.0000000000364
+[src\main.rs:49:17] ray.end_y() = 2000.0
+[src\main.rs:50:17] segment = PixelSegment {
+    pixel_x: 1834,
+    pixel_y: 2000,
+    start_t: 0.9999999999999847,
+    end_t: 1.0,
+}
+
+ */
+
+#[test]
+fn edge_case() {
+    let ray = Ray2 {
+        start_x: 0.0,
+        start_y: 165.00000000087311,
+        diff_x: 1835.0000000000364,
+        diff_y: 1834.9999999991269,
+    };
+    for crossing in BoundaryTraversal::new(ray) {
+        assert!(crossing.pixel_x < 2000, "{crossing:#?}");
+        assert!(crossing.pixel_y < 2000, "{crossing:#?}");
+    }
+}
+
 #[test]
 fn only_x_increasing() {
     let ray = Ray2 {
