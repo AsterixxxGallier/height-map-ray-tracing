@@ -110,13 +110,12 @@ fn main() {
             let tile_rays =
                 par_tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
 
-            // `a` is the number of tile rays in the iterator,
-            // `b` is the number of tile rays we actually had to check.
-            // This counting method is a bit clunky, but it's much more performant than atomics.
-            let (a, b) = tile_rays
+            tile_rays
                 .map(|(tile_ray, ray_index)| {
                     if is_free[ray_index].load(Ordering::Relaxed) == false {
                         // ray already intersects in other tile
+                        // `1` is for counting the tile ray
+                        // `0` indicates that this tile ray is not being checked
                         return (1, 0);
                     }
 
@@ -136,10 +135,11 @@ fn main() {
                         is_free[ray_index].store(false, Ordering::Relaxed);
                     }
 
+                    // `1` is for counting the tile ray
+                    // `1` indicates that this tile ray has been checked
                     (1, 1)
                 })
-                .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
-            (a, b)
+                .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1))
         })
         .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
 
