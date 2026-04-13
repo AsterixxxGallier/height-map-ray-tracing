@@ -1,12 +1,13 @@
 use crate::curvature::curvature_drop;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::Ray3;
-use crate::tile_rays::tile_rays_by_tile;
+use crate::tile_rays::tile_rays_for_tile;
 use crate::tiles::{TileRegion, Tiles};
 use crate::transform::TileSpacePositionAcrossTiles;
 use indicatif::*;
-use rayon::prelude::*;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use rayon::iter::ParallelIterator;
+use rayon::prelude::IntoParallelRefIterator;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 pub mod curvature;
@@ -67,25 +68,29 @@ fn main() {
 
     let start = Instant::now();
     let rays = node_rays(&nodes).collect::<Vec<_>>();
-    let tile_rays = tile_rays_by_tile(rays.iter().map(|ray| ray.as_ray_2()));
-    println!("collected and segmented rays in {:?}", start.elapsed());
-    
+    println!("collected rays in {:?}", start.elapsed());
+
     let is_free = rays
         .iter()
         .map(|_| AtomicBool::new(true))
         .collect::<Vec<_>>();
-    let tile_rays_checked = AtomicUsize::new(0);
+    let mut checked_tile_ray_count = 0;
+    let mut total_tile_ray_count = 0;
     let start = Instant::now();
 
-    for (&tile_coordinates, tile_rays) in tile_rays.iter().progress() {
+    for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
+        let tile_rays =
+            tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
+
         let tile = tiles.download_and_load_tile(tile_coordinates);
-        tile_rays.par_iter().for_each(|&(tile_ray, ray_index)| {
+        // `a` is the number of tile rays in the iterator,
+        // `b` is the number of tile rays we actually had to check.
+        // This counting method is a bit clunky, but it's much more performant than atomics.
+        let (a, b) = tile_rays.map(|(tile_ray, ray_index)| {
             if is_free[ray_index].load(Ordering::Relaxed) == false {
                 // ray already intersects in other tile
-                return;
+                return (1, 0);
             }
-
-            tile_rays_checked.fetch_add(1, Ordering::Relaxed);
 
             let whole_ray = &rays[ray_index];
             // whole_ray coordinates are in tile space, where 1.0 is 1000 m
@@ -101,7 +106,12 @@ fn main() {
             if !free {
                 is_free[ray_index].store(false, Ordering::Relaxed);
             }
-        });
+
+            (1, 1)
+        }).reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+        total_tile_ray_count += a;
+        checked_tile_ray_count += b;
+
         tiles.discard_tile(tile_coordinates);
     }
 
@@ -112,8 +122,6 @@ fn main() {
         .count();
     let total_count = is_free.len();
     let whole_ray_count = rays.len();
-    let checked_tile_ray_count = tile_rays_checked.load(Ordering::Relaxed);
-    let total_tile_ray_count = tile_rays.values().map(|rays| rays.len()).sum::<usize>();
     println!(
         "{:.2}% free ({free_count} of {total_count})",
         free_count as f64 / total_count as f64 * 100.0
