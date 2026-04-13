@@ -53,7 +53,6 @@ fn main() {
     let start = Instant::now();
     tiles.load_region(region);
     println!("loaded tiles in {:?}", start.elapsed());
-    // return;
 
     let mut nodes = read_nodes("nodes.csv");
     // filter out out-of-bounds nodes
