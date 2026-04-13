@@ -2,7 +2,7 @@ use crate::curvature::curvature_drop;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::Ray3;
 use crate::tile_rays::par_tile_rays_for_tile;
-use crate::tiles::{TileRegion, Tiles};
+use crate::tiles::{download_and_load_tile, TileRegion};
 use crate::transform::TileSpacePositionAcrossTiles;
 use indicatif::*;
 use rayon::iter::ParallelIterator;
@@ -49,11 +49,6 @@ fn main() {
         y_min: 6858,
         y_max: 6867,
     };
-    let mut tiles = Tiles::new("tiles");
-    let start = Instant::now();
-    tiles.load_region(region);
-    println!("loaded tiles in {:?}", start.elapsed());
-    // return;
 
     let mut nodes = read_nodes("nodes.csv");
     // filter out out-of-bounds nodes
@@ -74,46 +69,53 @@ fn main() {
         .iter()
         .map(|_| AtomicBool::new(true))
         .collect::<Vec<_>>();
-    let mut checked_tile_ray_count = 0;
-    let mut total_tile_ray_count = 0;
     let start = Instant::now();
 
-    for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
-        let tile_rays =
-            par_tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
+    let (total_tile_ray_count, checked_tile_ray_count) = region
+        .par_coordinates()
+        .progress_count(region.area() as u64)
+        .map(|tile_coordinates| {
+            (
+                tile_coordinates,
+                download_and_load_tile("tiles", tile_coordinates),
+            )
+        })
+        .map(|(tile_coordinates, tile)| {
+            let tile_rays =
+                par_tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
 
-        let tile = tiles.download_and_load_tile(tile_coordinates);
-        // `a` is the number of tile rays in the iterator,
-        // `b` is the number of tile rays we actually had to check.
-        // This counting method is a bit clunky, but it's much more performant than atomics.
-        let (a, b) = tile_rays.map(|(tile_ray, ray_index)| {
-            if is_free[ray_index].load(Ordering::Relaxed) == false {
-                // ray already intersects in other tile
-                return (1, 0);
-            }
+            // `a` is the number of tile rays in the iterator,
+            // `b` is the number of tile rays we actually had to check.
+            // This counting method is a bit clunky, but it's much more performant than atomics.
+            let (a, b) = tile_rays
+                .map(|(tile_ray, ray_index)| {
+                    if is_free[ray_index].load(Ordering::Relaxed) == false {
+                        // ray already intersects in other tile
+                        return (1, 0);
+                    }
 
-            let whole_ray = &rays[ray_index];
-            // whole_ray coordinates are in tile space, where 1.0 is 1000 m
-            let whole_ray_length_in_meters =
-                (whole_ray.diff_x * whole_ray.diff_x + whole_ray.diff_y * whole_ray.diff_y).sqrt()
-                    * 1_000.0;
-            let mut start_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.start_t;
-            let mut end_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.end_t;
-            start_z -= curvature_drop(tile_ray.start_t, whole_ray_length_in_meters);
-            end_z -= curvature_drop(tile_ray.end_t, whole_ray_length_in_meters);
-            let ray = tile_ray.ray.with_z(start_z, end_z - start_z);
-            let free = tile.is_line_free(ray);
-            if !free {
-                is_free[ray_index].store(false, Ordering::Relaxed);
-            }
+                    let whole_ray = &rays[ray_index];
+                    // whole_ray coordinates are in tile space, where 1.0 is 1000 m
+                    let whole_ray_length_in_meters = (whole_ray.diff_x * whole_ray.diff_x
+                        + whole_ray.diff_y * whole_ray.diff_y)
+                        .sqrt()
+                        * 1_000.0;
+                    let mut start_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.start_t;
+                    let mut end_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.end_t;
+                    start_z -= curvature_drop(tile_ray.start_t, whole_ray_length_in_meters);
+                    end_z -= curvature_drop(tile_ray.end_t, whole_ray_length_in_meters);
+                    let ray = tile_ray.ray.with_z(start_z, end_z - start_z);
+                    let free = tile.is_line_free(ray);
+                    if !free {
+                        is_free[ray_index].store(false, Ordering::Relaxed);
+                    }
 
-            (1, 1)
-        }).reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
-        total_tile_ray_count += a;
-        checked_tile_ray_count += b;
-
-        tiles.discard_tile(tile_coordinates);
-    }
+                    (1, 1)
+                })
+                .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+            (a, b)
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
 
     let duration = start.elapsed();
     let free_count = is_free

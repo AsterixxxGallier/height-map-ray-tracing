@@ -1,14 +1,9 @@
 use crate::map::Map;
 use crate::tile::Tile;
 use crate::tiles::download::download_tile;
-use crate::transform::PixelSpacePositionAcrossTiles;
-use image::{ImageBuffer, Rgb};
-use indicatif::ProgressIterator;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::collections::HashMap;
-use std::fs;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub mod download;
 
@@ -45,123 +40,27 @@ impl TileRegion {
     }
 }
 
-pub struct Tiles {
-    tiles: HashMap<TileCoordinates, Tile>,
-    unused_tiles: Vec<Tile>,
-    directory: PathBuf,
-}
-
 fn tile_filename(coordinates: TileCoordinates) -> String {
     let tile_id = format_args!("{:0>4}_{:0>4}", coordinates.x, coordinates.y);
     format!("LHD_FXX_{tile_id}_MNS_O_0M50_LAMB93_IGN69.tif")
 }
 
-impl Tiles {
-    pub fn new(directory: impl AsRef<Path>) -> Self {
-        Self {
-            tiles: HashMap::new(),
-            unused_tiles: Vec::new(),
-            directory: directory.as_ref().to_owned(),
-        }
-    }
+pub fn load_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) -> Tile {
+    let filename = tile_filename(coordinates);
+    let path = directory.as_ref().join(filename);
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) => panic!(
+            "could not open file for tile coordinates x={} y={}: {error}",
+            coordinates.x, coordinates.y,
+        ),
+    };
 
-    pub fn discard_tile(&mut self, coordinates: TileCoordinates) {
-        let tile = self.tiles.remove(&coordinates).unwrap();
-        self.unused_tiles.push(tile);
-    }
+    let map = Map::<f32>::load_from_tiff(2000, 2000, file);
+    Tile::new(map)
+}
 
-    pub fn discard_and_delete_tile(&mut self, coordinates: TileCoordinates) {
-        self.discard_tile(coordinates);
-        let filename = tile_filename(coordinates);
-        let path = self.directory.join(filename);
-        fs::remove_file(path).unwrap();
-    }
-
-    #[inline(never)]
-    #[cold]
-    pub fn load_tile(&mut self, coordinates: TileCoordinates) -> &Tile {
-        if self.tiles.contains_key(&coordinates) {
-            return self.tiles.get(&coordinates).unwrap();
-        }
-
-        let filename = tile_filename(coordinates);
-        let path = self.directory.join(filename);
-        let file = match File::open(path) {
-            Ok(file) => file,
-            Err(error) => panic!(
-                "could not open file for tile coordinates x={} y={}: {error}",
-                coordinates.x, coordinates.y,
-            ),
-        };
-
-        let tile = if let Some(mut tile) = self.unused_tiles.pop() {
-            // reuse the allocation
-            tile.regenerate(|map| {
-                map.regenerate_from_tiff(file);
-            });
-            tile
-        } else {
-            let map = Map::<f32>::load_from_tiff(2000, 2000, file);
-            Tile::new(map)
-        };
-        self.tiles.insert(coordinates, tile);
-        self.tiles.get(&coordinates).unwrap()
-    }
-
-    pub fn download_and_load_tile(&mut self, coordinates: TileCoordinates) -> &Tile {
-        if self.tiles.contains_key(&coordinates) {
-            return self.tiles.get(&coordinates).unwrap();
-        }
-
-        download_tile(&self.directory, coordinates);
-        self.load_tile(coordinates)
-    }
-
-    pub fn load_region(&mut self, region: TileRegion) {
-        for coordinates in region
-            .coordinates()
-            .progress_count(region.coordinates().count() as u64)
-        {
-            _ = self.load_tile(coordinates);
-        }
-    }
-
-    pub fn download_and_load_region(&mut self, region: TileRegion) {
-        for coordinates in region
-            .coordinates()
-            .progress_count(region.coordinates().count() as u64)
-        {
-            _ = self.download_and_load_tile(coordinates);
-        }
-    }
-
-    pub fn tile(&self, coordinates: TileCoordinates) -> Option<&Tile> {
-        self.tiles.get(&coordinates)
-    }
-
-    pub fn as_image(&self, region: TileRegion, white_value: f32) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-        let width = ((region.x_max - region.x_min + 1) * 2000) as u32;
-        let height = ((region.y_max - region.y_min + 1) * 2000) as u32;
-        image::RgbImage::from_fn(width, height, |x, y| {
-            let y = height - 1 - y;
-            let position = PixelSpacePositionAcrossTiles {
-                x: (region.x_min * 2000 + x as i32) as f64,
-                y: (region.y_min * 2000 + y as i32) as f64,
-            };
-            let (tile_coordinates, position_in_tile) = position.split();
-            if let Some(tile) = self.tile(tile_coordinates) {
-                let value = tile
-                    .map()
-                    .get(position_in_tile.x as usize, position_in_tile.y as usize);
-                if value >= white_value {
-                    Rgb([255, 0, 0])
-                } else {
-                    let value_u8 = ((value / white_value).clamp(0.0, 1.0) * 255.0) as u8;
-                    Rgb([value_u8, value_u8, value_u8])
-                }
-            } else {
-                Rgb([255, 0, 255])
-            }
-        })
-    }
+pub fn download_and_load_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) -> Tile {
+    download_tile(&directory, coordinates);
+    load_tile(directory, coordinates)
 }
