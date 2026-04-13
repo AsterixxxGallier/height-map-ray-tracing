@@ -18,6 +18,10 @@ impl<T: Float> Ray2<T> {
             diff_y: self.diff_y * (end_t - start_t),
         }
     }
+
+    pub fn length_squared(&self) -> T {
+        self.diff_x * self.diff_x + self.diff_y * self.diff_y
+    }
 }
 
 impl<T: Copy + Add<Output = T>> Ray2<T> {

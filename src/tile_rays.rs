@@ -1,7 +1,7 @@
 use crate::ray::Ray2;
 use crate::tiles::TileCoordinates;
 use crate::transform::TileSpacePositionAcrossTiles;
-use rayon::prelude::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelIterator;
 
 /// A segment of a ray that is entirely contained within one tile.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -12,21 +12,21 @@ pub struct TileRay {
     pub ray: Ray2<f64>,
 }
 
-pub fn tile_rays_for_tile(
+pub fn tile_rays_for_tile<Id>(
     tile: TileCoordinates,
-    rays: impl Iterator<Item = Ray2<f64>>,
-) -> impl Iterator<Item = (TileRay, usize)> {
-    rays.enumerate().filter_map(move |(ray_index, ray)| {
-        tile_ray_in_tile(tile, ray).map(|tile_ray| (tile_ray, ray_index))
+    rays: impl Iterator<Item = (Id, Ray2<f64>)>,
+) -> impl Iterator<Item = (TileRay, Id)> {
+    rays.filter_map(move |(ray_id, ray)| {
+        tile_ray_in_tile(tile, ray).map(|tile_ray| (tile_ray, ray_id))
     })
 }
 
-pub fn par_tile_rays_for_tile(
+pub fn par_tile_rays_for_tile<Id: Send>(
     tile: TileCoordinates,
-    rays: impl IndexedParallelIterator<Item = Ray2<f64>>,
-) -> impl ParallelIterator<Item = (TileRay, usize)> {
-    rays.enumerate().filter_map(move |(ray_index, ray)| {
-        tile_ray_in_tile(tile, ray).map(|tile_ray| (tile_ray, ray_index))
+    rays: impl ParallelIterator<Item = (Id, Ray2<f64>)>,
+) -> impl ParallelIterator<Item = (TileRay, Id)> {
+    rays.filter_map(move |(ray_id, ray)| {
+        tile_ray_in_tile(tile, ray).map(|tile_ray| (tile_ray, ray_id))
     })
 }
 
