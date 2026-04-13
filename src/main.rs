@@ -1,7 +1,7 @@
 use crate::curvature::curvature_drop;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::Ray3;
-use crate::tile_rays::tile_rays_for_tile;
+use crate::tile_rays::par_tile_rays_for_tile;
 use crate::tiles::{TileRegion, Tiles};
 use crate::transform::TileSpacePositionAcrossTiles;
 use indicatif::*;
@@ -80,7 +80,7 @@ fn main() {
 
     for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
         let tile_rays =
-            tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
+            par_tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
 
         let tile = tiles.download_and_load_tile(tile_coordinates);
         // `a` is the number of tile rays in the iterator,

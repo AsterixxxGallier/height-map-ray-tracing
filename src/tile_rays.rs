@@ -14,6 +14,15 @@ pub struct TileRay {
 
 pub fn tile_rays_for_tile(
     tile: TileCoordinates,
+    rays: impl Iterator<Item = Ray2<f64>>,
+) -> impl Iterator<Item = (TileRay, usize)> {
+    rays.enumerate().filter_map(move |(ray_index, ray)| {
+        tile_ray_in_tile(tile, ray).map(|tile_ray| (tile_ray, ray_index))
+    })
+}
+
+pub fn par_tile_rays_for_tile(
+    tile: TileCoordinates,
     rays: impl IndexedParallelIterator<Item = Ray2<f64>>,
 ) -> impl ParallelIterator<Item = (TileRay, usize)> {
     rays.enumerate().filter_map(move |(ray_index, ray)| {
