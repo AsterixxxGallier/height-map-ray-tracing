@@ -9,7 +9,10 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
+use clap::Parser;
+use crate::cli::Args;
 
+pub mod cli;
 pub mod curvature;
 pub mod intersection;
 pub mod map;
@@ -21,28 +24,49 @@ pub mod tiles;
 pub mod transform;
 pub mod traversal;
 
-pub fn node_rays(nodes: &[Node]) -> impl Iterator<Item = Ray3<f64>> {
+pub fn node_rays(nodes: &[Node], max_length_km: f64) -> impl Iterator<Item = Ray3<f64>> {
+    let max_length_squared = max_length_km * max_length_km;
     nodes
         .iter()
         .enumerate()
-        .flat_map(|(first_node_index, &first_node)| {
-            nodes[..first_node_index].iter().map(move |&second_node| {
-                let first_position: TileSpacePositionAcrossTiles = first_node.position().into();
-                let second_position: TileSpacePositionAcrossTiles = second_node.position().into();
-                Ray3 {
-                    start_x: first_position.x,
-                    start_y: first_position.y,
-                    start_z: first_node.z,
-                    diff_x: second_position.x - first_position.x,
-                    diff_y: second_position.y - first_position.y,
-                    diff_z: second_node.z - first_node.z,
-                }
-            })
+        .flat_map(move |(first_node_index, &first_node)| {
+            nodes[..first_node_index]
+                .iter()
+                .filter_map(move |&second_node| {
+                    if !first_node.active && !second_node.active {
+                        return None;
+                    }
+
+                    let first_position: TileSpacePositionAcrossTiles = first_node.position().into();
+                    let second_position: TileSpacePositionAcrossTiles =
+                        second_node.position().into();
+
+                    let distance_squared = (first_position.x - second_position.x)
+                        * (first_position.x - second_position.x)
+                        + (first_position.y - second_position.y)
+                            * (first_position.y - second_position.y);
+
+                    if distance_squared > max_length_squared {
+                        return None;
+                    }
+
+                    Some(Ray3 {
+                        start_x: first_position.x,
+                        start_y: first_position.y,
+                        start_z: first_node.z,
+                        diff_x: second_position.x - first_position.x,
+                        diff_y: second_position.y - first_position.y,
+                        diff_z: second_node.z - first_node.z,
+                    })
+                })
         })
 }
 
 #[allow(unreachable_code)]
 fn main() {
+    let Args { max_link_length } = Args::parse();
+    let max_link_length_km = max_link_length / 1000.0;
+
     let region = TileRegion {
         x_min: 643,
         x_max: 652,
@@ -51,6 +75,7 @@ fn main() {
     };
 
     let mut nodes = read_nodes("nodes.csv");
+
     // filter out out-of-bounds nodes
     nodes.retain(|node| {
         let position = node.position();
@@ -62,7 +87,8 @@ fn main() {
     });
 
     let start = Instant::now();
-    let rays = node_rays(&nodes).collect::<Vec<_>>();
+    let rays = node_rays(&nodes, max_link_length_km).collect::<Vec<_>>();
+    let rays: Vec<_> = (0..10).flat_map(|_| rays.iter().copied()).collect();
     println!("collected rays in {:?}", start.elapsed());
 
     let is_free = rays
