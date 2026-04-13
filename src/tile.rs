@@ -14,6 +14,10 @@ const _: () = {
         assert!(2000usize.is_multiple_of(CHUNK_SIZES[i]));
         i += 1;
     }
+    while i < CHUNK_SIZES.len() - 1 {
+        assert!(CHUNK_SIZES[i] > CHUNK_SIZES[i + 1]);
+        i += 1;
+    }
     assert!(CHUNK_SIZES[CHUNK_SIZES.len() - 1] == 1);
 };
 
@@ -39,8 +43,17 @@ impl Tile {
     pub fn new(map: Map<f32>) -> Self {
         assert_eq!(map.x_len(), 2000);
         assert_eq!(map.y_len(), 2000);
+        let mut map = Some(map);
         let maps = CHUNK_SIZES.map(|chunk_size| {
-            Map::from_fn(2000 / chunk_size, 2000 / chunk_size, downsize_map(&map, chunk_size))
+            if chunk_size == 1 {
+                map.take().unwrap()
+            } else {
+                Map::from_fn(
+                    2000 / chunk_size,
+                    2000 / chunk_size,
+                    downsize_map(map.as_ref().unwrap(), chunk_size),
+                )
+            }
         });
         Self { maps }
     }

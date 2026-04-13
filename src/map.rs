@@ -1,7 +1,9 @@
+use rayon::iter::ParallelIterator;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
 use image::{ImageBuffer, Rgb};
+use rayon::prelude::IntoParallelIterator;
 use tiff::decoder::{Decoder, DecodingResult};
 
 /// A two-dimensional array of values.
@@ -38,10 +40,10 @@ impl<T: Copy + Default> Map<T> {
     pub fn from_fn(
         x_len: usize,
         y_len: usize,
-        f: impl Fn(usize, usize) -> T,
-    ) -> Self {
+        f: impl Fn(usize, usize) -> T + Sync,
+    ) -> Self where T: Send {
         Self {
-            store: (0..x_len * y_len).map(|index| {
+            store: (0..x_len * y_len).into_par_iter().map(|index| {
                 let x_index = index % x_len;
                 let y_index = y_len - 1 - index / x_len;
                 f(x_index, y_index)
@@ -55,8 +57,8 @@ impl<T: Copy + Default> Map<T> {
         &mut self,
         f: impl Fn(usize, usize) -> T,
     ) {
-        for x_index in 0..self.x_len {
-            for y_index in 0..self.y_len {
+        for y_index in 0..self.y_len {
+            for x_index in 0..self.x_len {
                 self.set(x_index, y_index, f(x_index, y_index));
             }
         }

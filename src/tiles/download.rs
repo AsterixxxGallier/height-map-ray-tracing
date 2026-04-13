@@ -38,6 +38,8 @@ fn tile_url_and_filename(coordinates: TileCoordinates) -> (String, String) {
     (url, filename)
 }
 
+#[inline(never)]
+#[cold]
 pub fn download_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) {
     download_tile_with_client(&mut Client::new(), directory, coordinates);
 }

@@ -49,7 +49,10 @@ fn main() {
         y_max: 6867,
     };
     let mut tiles = Tiles::new("tiles");
-    // tiles.load_region(region);
+    let start = Instant::now();
+    tiles.load_region(region);
+    println!("loaded tiles in {:?}", start.elapsed());
+    // return;
 
     let mut nodes = read_nodes("nodes.csv");
     // filter out out-of-bounds nodes
@@ -62,8 +65,11 @@ fn main() {
             && position.y <= (region.y_max + 1) as f64
     });
 
+    let start = Instant::now();
     let rays = node_rays(&nodes).collect::<Vec<_>>();
     let tile_rays = tile_rays_by_tile(rays.iter().map(|ray| ray.as_ray_2()));
+    println!("collected and segmented rays in {:?}", start.elapsed());
+    
     let is_free = rays
         .iter()
         .map(|_| AtomicBool::new(true))
@@ -72,7 +78,6 @@ fn main() {
     let start = Instant::now();
 
     for (&tile_coordinates, tile_rays) in tile_rays.iter().progress() {
-        // let tile = tiles.tile(tile_coordinates).unwrap();
         let tile = tiles.download_and_load_tile(tile_coordinates);
         tile_rays.par_iter().for_each(|&(tile_ray, ray_index)| {
             if is_free[ray_index].load(Ordering::Relaxed) == false {

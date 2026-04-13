@@ -1,6 +1,6 @@
 use crate::map::Map;
 use crate::tile::Tile;
-use crate::tiles::download::{download_tile, download_tiles};
+use crate::tiles::download::download_tile;
 use crate::transform::PixelSpacePositionAcrossTiles;
 use image::{ImageBuffer, Rgb};
 use indicatif::ProgressIterator;
@@ -77,7 +77,13 @@ impl Tiles {
         fs::remove_file(path).unwrap();
     }
 
+    #[inline(never)]
+    #[cold]
     pub fn load_tile(&mut self, coordinates: TileCoordinates) -> &Tile {
+        if self.tiles.contains_key(&coordinates) {
+            return self.tiles.get(&coordinates).unwrap();
+        }
+
         let filename = tile_filename(coordinates);
         let path = self.directory.join(filename);
         let file = match File::open(path) {
@@ -103,6 +109,10 @@ impl Tiles {
     }
 
     pub fn download_and_load_tile(&mut self, coordinates: TileCoordinates) -> &Tile {
+        if self.tiles.contains_key(&coordinates) {
+            return self.tiles.get(&coordinates).unwrap();
+        }
+
         download_tile(&self.directory, coordinates);
         self.load_tile(coordinates)
     }
@@ -117,8 +127,12 @@ impl Tiles {
     }
 
     pub fn download_and_load_region(&mut self, region: TileRegion) {
-        download_tiles(&self.directory, region);
-        self.load_region(region);
+        for coordinates in region
+            .coordinates()
+            .progress_count(region.coordinates().count() as u64)
+        {
+            _ = self.download_and_load_tile(coordinates);
+        }
     }
 
     pub fn tile(&self, coordinates: TileCoordinates) -> Option<&Tile> {
