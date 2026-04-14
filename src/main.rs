@@ -1,16 +1,17 @@
+use crate::cli::Args;
 use crate::curvature::curvature_drop;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::Ray3;
 use crate::tile_rays::par_tile_rays_for_tile;
-use crate::tiles::{download_and_load_tile, TileRegion};
+use crate::tiles::download::download_tile;
+use crate::tiles::{load_tile, TileRegion};
 use crate::transform::TileSpacePositionAcrossTiles;
+use clap::Parser;
 use indicatif::*;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
-use clap::Parser;
-use crate::cli::Args;
 
 pub mod cli;
 pub mod curvature;
@@ -67,6 +68,9 @@ fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
+    let tiles_directory = "tiles";
+    let nodes_file = "nodes.csv";
+
     let region = TileRegion {
         x_min: 643,
         x_max: 652,
@@ -74,7 +78,11 @@ fn main() {
         y_max: 6867,
     };
 
-    let mut nodes = read_nodes("nodes.csv");
+    for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
+        download_tile(tiles_directory, tile_coordinates);
+    }
+
+    let mut nodes = read_nodes(nodes_file);
 
     // filter out out-of-bounds nodes
     nodes.retain(|node| {
@@ -88,7 +96,6 @@ fn main() {
 
     let start = Instant::now();
     let rays = node_rays(&nodes, max_link_length_km).collect::<Vec<_>>();
-    let rays: Vec<_> = (0..10).flat_map(|_| rays.iter().copied()).collect();
     println!("collected rays in {:?}", start.elapsed());
 
     let is_free = rays
@@ -103,7 +110,7 @@ fn main() {
         .map(|tile_coordinates| {
             (
                 tile_coordinates,
-                download_and_load_tile("tiles", tile_coordinates),
+                load_tile(tiles_directory, tile_coordinates),
             )
         })
         .map(|(tile_coordinates, tile)| {
