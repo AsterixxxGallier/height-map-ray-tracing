@@ -72,10 +72,10 @@ fn main() {
     let nodes_file = "nodes.csv";
 
     let region = TileRegion {
-        x_min: 643,
-        x_max: 652,
-        y_min: 6858,
-        y_max: 6867,
+        x_min: 616,
+        x_max: 685,
+        y_min: 6834,
+        y_max: 6903,
     };
 
     for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
