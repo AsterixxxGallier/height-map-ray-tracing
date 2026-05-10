@@ -1,9 +1,10 @@
+use std::process::exit;
 use crate::cli::Args;
 use crate::curvature::curvature_drop;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::Ray3;
 use crate::tile_rays::par_tile_rays_for_tile;
-use crate::tiles::download::download_tile;
+use crate::tiles::download::{download_tile, download_tiles};
 use crate::tiles::{load_tile, TileRegion};
 use crate::transform::TileSpacePositionAcrossTiles;
 use clap::Parser;
@@ -68,15 +69,37 @@ fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
-    let tiles_directory = "tiles";
+    let tiles_directory = "G:\\fso\\tiles\\bordeaux";
     let nodes_file = "nodes.csv";
 
-    let region = TileRegion {
+    std::fs::create_dir_all(tiles_directory).unwrap();
+
+    let region_paris = TileRegion {
         x_min: 616,
         x_max: 685,
         y_min: 6834,
         y_max: 6903,
     };
+
+    // Recommended max link length: <5 km
+    let region_bordeaux = TileRegion {
+        x_min: 396,
+        x_max: 465,
+        y_min: 6379,
+        y_max: 6450,
+    };
+
+    let region_lyon = TileRegion {
+        x_min: 807,
+        x_max: 876,
+        y_min: 6486,
+        y_max: 6555,
+    };
+
+    download_tiles(tiles_directory, region_bordeaux);
+    exit(0);
+
+    let region = region_bordeaux;
 
     for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
         download_tile(tiles_directory, tile_coordinates);
