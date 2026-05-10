@@ -1,8 +1,10 @@
-use std::fs::File;
-use std::io;
 use std::path::Path;
-use indicatif::ProgressIterator;
-use reqwest::blocking::Client;
+use std::sync::Arc;
+use reqwest::Client;
+use tokio::sync::Semaphore;
+use tokio::time::{interval, Duration};
+use tokio::io::AsyncWriteExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use crate::tiles::{tile_filename, TileCoordinates, TileRegion};
 
 struct TileBounds {
@@ -41,26 +43,84 @@ fn tile_url_and_filename(coordinates: TileCoordinates) -> (String, String) {
 
 #[inline(never)]
 #[cold]
-pub fn download_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) {
-    download_tile_with_client(&mut Client::new(), directory, coordinates);
-}
-
-pub fn download_tile_with_client(client: &Client, directory: impl AsRef<Path>, coordinates: TileCoordinates) {
+pub async fn download_tile_async(client: &Client, directory: impl AsRef<Path>, coordinates: TileCoordinates) {
     let (url, filename) = tile_url_and_filename(coordinates);
     let path = directory.as_ref().join(filename);
-    match File::create_new(path) {
-        Ok(mut file) => {
-            let mut resp = client.get(url).send().expect("request failed");
-            io::copy(&mut resp, &mut file).expect("failed to copy content");
-        }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => return,
+
+    // Use Tokio's async filesystem operations
+    let file_result = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .await;
+
+    let mut file = match file_result {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return,
         Err(error) => panic!("failed to create file: {error}"),
+    };
+
+    // Execute the async network request
+    let mut response = client.get(&url).send().await.expect("request failed");
+
+    // Stream the response body directly to the file without loading it entirely into RAM
+    while let Some(chunk) = response.chunk().await.expect("failed to read chunk") {
+        file.write_all(&chunk).await.expect("failed to write to file");
     }
 }
 
-pub fn download_tiles(directory: impl AsRef<Path>, region: TileRegion) {
+pub async fn download_tiles(directory: impl AsRef<Path>, region: TileRegion) {
     let client = Client::new();
-    for coordinates in region.coordinates().progress_count(region.area() as u64) {
-        download_tile_with_client(&client, directory.as_ref(), coordinates);
+
+    // 1. Concurrency Control: Cap at 50 simultaneous downloads.
+    // You can tune this based on your bandwidth.
+    let max_concurrent_downloads = 50;
+    let semaphore = Arc::new(Semaphore::new(max_concurrent_downloads));
+
+    // 2. Rate Limiting: 10 requests per second = 1 tick every 100ms.
+    let mut rate_limit = interval(Duration::from_millis(100));
+
+    // Progress bar setup
+    let total_tiles = region.area() as u64;
+    let pb = ProgressBar::new(total_tiles);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+        .unwrap()
+        .progress_chars("##-"));
+
+    let dir = directory.as_ref().to_path_buf();
+    let mut tasks = Vec::new();
+
+    for coordinates in region.coordinates() {
+        // Wait until 100ms has passed since the last tick
+        rate_limit.tick().await;
+
+        // Acquire a permit. If 50 downloads are actively running, this will pause
+        // the loop until one finishes, preventing runaway memory usage.
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+
+        // Clone references for the async task
+        let client = client.clone();
+        let dir = dir.clone();
+        let pb = pb.clone();
+
+        // Spawn a lightweight Tokio task
+        let task = tokio::spawn(async move {
+            // The permit is moved into this closure and automatically dropped
+            // when the download completes, freeing up a slot.
+            let _permit = permit;
+
+            download_tile_async(&client, &dir, coordinates).await;
+            pb.inc(1);
+        });
+
+        tasks.push(task);
     }
+
+    // Await the completion of all spawned tasks
+    for task in tasks {
+        let _ = task.await;
+    }
+
+    pb.finish_with_message("All tiles downloaded!");
 }

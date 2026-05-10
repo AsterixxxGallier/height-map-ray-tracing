@@ -4,7 +4,7 @@ use crate::curvature::curvature_drop;
 use crate::nodes::{read_nodes, Node};
 use crate::ray::Ray3;
 use crate::tile_rays::par_tile_rays_for_tile;
-use crate::tiles::download::{download_tile, download_tiles};
+use crate::tiles::download::{download_tiles};
 use crate::tiles::{load_tile, TileRegion};
 use crate::transform::TileSpacePositionAcrossTiles;
 use clap::Parser;
@@ -64,8 +64,9 @@ pub fn node_rays(nodes: &[Node], max_length_km: f64) -> impl Iterator<Item = Ray
         })
 }
 
+#[tokio::main]
 #[allow(unreachable_code)]
-fn main() {
+async fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
@@ -96,13 +97,14 @@ fn main() {
         y_max: 6555,
     };
 
-    download_tiles(tiles_directory, region_bordeaux);
+    download_tiles(tiles_directory, region_bordeaux).await;
     exit(0);
 
     let region = region_bordeaux;
 
     for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
-        download_tile(tiles_directory, tile_coordinates);
+        // TODO
+        // download_tile(tiles_directory, tile_coordinates);
     }
 
     let mut nodes = read_nodes(nodes_file);

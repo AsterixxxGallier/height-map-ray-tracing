@@ -1,6 +1,5 @@
 use crate::map::Map;
 use crate::tile::Tile;
-use crate::tiles::download::download_tile;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::fs::File;
 use std::path::Path;
@@ -61,6 +60,7 @@ pub fn load_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) -> T
 }
 
 pub fn download_and_load_tile(directory: impl AsRef<Path>, coordinates: TileCoordinates) -> Tile {
-    download_tile(&directory, coordinates);
+    // TODO
+    // download_tile(&directory, coordinates);
     load_tile(directory, coordinates)
 }
