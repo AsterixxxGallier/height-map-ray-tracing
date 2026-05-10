@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io;
 use std::path::Path;
+use indicatif::ProgressIterator;
 use reqwest::blocking::Client;
 use crate::tiles::{tile_filename, TileCoordinates, TileRegion};
 
@@ -59,7 +60,7 @@ pub fn download_tile_with_client(client: &Client, directory: impl AsRef<Path>, c
 
 pub fn download_tiles(directory: impl AsRef<Path>, region: TileRegion) {
     let client = Client::new();
-    for coordinates in region.coordinates() {
+    for coordinates in region.coordinates().progress_count(region.area() as u64) {
         download_tile_with_client(&client, directory.as_ref(), coordinates);
     }
 }
