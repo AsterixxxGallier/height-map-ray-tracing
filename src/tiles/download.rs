@@ -70,46 +70,60 @@ pub async fn download_tile_async(client: &Client, directory: impl AsRef<Path>, c
 }
 
 pub async fn download_tiles(directory: impl AsRef<Path>, region: TileRegion) {
+    let dir = directory.as_ref().to_path_buf();
+
+    // --- 1. State Reconciliation: Pre-filter existing files ---
+    let mut pending_coordinates = Vec::new();
+    for coordinates in region.coordinates() {
+        let filename = tile_filename(coordinates);
+        let path = dir.join(&filename);
+
+        // Synchronous path check. For local IO before kicking off heavy async tasks,
+        // this is virtually instantaneous and avoids the overhead of spawning async stat calls.
+        if !path.exists() {
+            pending_coordinates.push(coordinates);
+        }
+    }
+
+    let total_tiles = pending_coordinates.len() as u64;
+
+    if total_tiles == 0 {
+        println!("All tiles in this region are already downloaded!");
+        return;
+    }
+    // ----------------------------------------------------------
+
     let client = Client::new();
 
-    // 1. Concurrency Control: Cap at 50 simultaneous downloads.
-    // You can tune this based on your bandwidth.
+    // 2. Concurrency Control: Cap at 50 simultaneous downloads.
     let max_concurrent_downloads = 50;
     let semaphore = Arc::new(Semaphore::new(max_concurrent_downloads));
 
-    // 2. Rate Limiting: 10 requests per second = 1 tick every 100ms.
+    // 3. Rate Limiting: 10 requests per second = 1 tick every 100ms.
     let mut rate_limit = interval(Duration::from_millis(100));
 
-    // Progress bar setup
-    let total_tiles = region.area() as u64;
+    // Progress bar setup (now accurately tracking only remaining files)
     let pb = ProgressBar::new(total_tiles);
     pb.set_style(ProgressStyle::default_bar()
         .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
         .unwrap()
         .progress_chars("##-"));
 
-    let dir = directory.as_ref().to_path_buf();
     let mut tasks = Vec::new();
 
-    for coordinates in region.coordinates() {
+    // Iterate ONLY over the coordinates that still need to be downloaded
+    for coordinates in pending_coordinates {
         // Wait until 100ms has passed since the last tick
         rate_limit.tick().await;
 
-        // Acquire a permit. If 50 downloads are actively running, this will pause
-        // the loop until one finishes, preventing runaway memory usage.
         let permit = semaphore.clone().acquire_owned().await.unwrap();
 
-        // Clone references for the async task
         let client = client.clone();
         let dir = dir.clone();
         let pb = pb.clone();
 
-        // Spawn a lightweight Tokio task
         let task = tokio::spawn(async move {
-            // The permit is moved into this closure and automatically dropped
-            // when the download completes, freeing up a slot.
             let _permit = permit;
-
             download_tile_async(&client, &dir, coordinates).await;
             pb.inc(1);
         });
@@ -122,5 +136,5 @@ pub async fn download_tiles(directory: impl AsRef<Path>, region: TileRegion) {
         let _ = task.await;
     }
 
-    pb.finish_with_message("All tiles downloaded!");
+    pb.finish_with_message("All pending tiles downloaded!");
 }
