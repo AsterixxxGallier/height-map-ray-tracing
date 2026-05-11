@@ -70,7 +70,7 @@ async fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
-    let tiles_directory = "G:\\fso\\tiles\\bordeaux";
+    let tiles_directory = "G:\\fso\\tiles\\toulouse";
     let nodes_file = "nodes.csv";
 
     std::fs::create_dir_all(tiles_directory).unwrap();
@@ -97,7 +97,14 @@ async fn main() {
         y_max: 6555,
     };
 
-    download_tiles(tiles_directory, region_bordeaux).await;
+    let region_toulouse = TileRegion {
+        x_min: 539,
+        x_max: 608,
+        y_min: 6245,
+        y_max: 6314,
+    };
+
+    download_tiles(tiles_directory, region_toulouse).await;
     exit(0);
 
     let region = region_bordeaux;
