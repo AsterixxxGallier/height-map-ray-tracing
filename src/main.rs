@@ -104,15 +104,14 @@ async fn main() {
         y_max: 6314,
     };
 
+    let region = region_paris;
+
     download_tiles(tiles_directory, region_toulouse).await;
-    exit(0);
 
-    let region = region_bordeaux;
-
-    for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
+    /*for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
         // TODO
         // download_tile(tiles_directory, tile_coordinates);
-    }
+    }*/
 
     let mut nodes = read_nodes(nodes_file);
 
