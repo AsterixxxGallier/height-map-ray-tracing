@@ -6,7 +6,7 @@ use crate::transform::ModelSpacePosition;
 #[derive(Debug, Deserialize, Copy, Clone)]
 pub struct Node {
     pub _database_date: u64,
-    pub database_line: u64,
+    pub database_line: u32,
     pub x: f64,
     pub y: f64,
     pub z: f64,
