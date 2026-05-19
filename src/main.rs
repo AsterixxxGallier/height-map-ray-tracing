@@ -79,15 +79,6 @@ async fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
-    let region_name = "paris";
-
-    let tiles_directory = format!("/Volumes/Lagerstätte/fso/tiles/{region_name}");
-    let nodes_file = format!(
-        "/Users/leonardnolting/Development/cellfso/export/{region_name}/nodes.csv"
-    );
-
-    std::fs::create_dir_all(&tiles_directory).unwrap();
-
     let regions: HashMap<&str, TileRegion> = HashMap::from([
         ("paris", TileRegion {
             x_min: 616,
@@ -121,153 +112,160 @@ async fn main() {
         }),
     ]);
 
-    let region = &regions[region_name];
+    for region_name in ["toulouse"] {
+        println!("Starting region {}", region_name);
+        let tiles_directory = format!("/Volumes/Lagerstätte/fso/tiles/{region_name}");
+        let nodes_file = format!(
+            "/Users/leonardnolting/Development/cellfso/export/{region_name}/nodes.csv"
+        );
 
-    // download_tiles(tiles_directory, region_toulouse).await;
+        std::fs::create_dir_all(&tiles_directory).unwrap();
 
-    /*for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
-        // TODO
-        // download_tile(tiles_directory, tile_coordinates);
-    }*/
+        let region = &regions[region_name];
 
-    let mut nodes = read_nodes(&nodes_file);
+        // download_tiles(tiles_directory, region_toulouse).await;
 
-    println!("Loaded nodes");
-    println!("Loading tiles from {}", tiles_directory);
+        let mut nodes = read_nodes(&nodes_file);
 
-    // filter out out-of-bounds nodes
-    nodes.retain(|node| {
-        let position = node.position();
-        let position: TileSpacePositionAcrossTiles = position.into();
-        position.x >= region.x_min as f64
-            && position.x <= (region.x_max + 1) as f64
-            && position.y >= region.y_min as f64
-            && position.y <= (region.y_max + 1) as f64
-    });
+        println!("Loaded nodes");
+        println!("Loading tiles from {}", tiles_directory);
 
-    let start = Instant::now();
-    let rays = node_rays(&nodes, max_link_length_km).collect::<Vec<_>>();
-    println!("collected rays in {:?}", start.elapsed());
+        // filter out out-of-bounds nodes
+        nodes.retain(|node| {
+            let position = node.position();
+            let position: TileSpacePositionAcrossTiles = position.into();
+            position.x >= region.x_min as f64
+                && position.x <= (region.x_max + 1) as f64
+                && position.y >= region.y_min as f64
+                && position.y <= (region.y_max + 1) as f64
+        });
 
-    let is_free = rays
-        .iter()
-        .map(|_| AtomicBool::new(true))
-        .collect::<Vec<_>>();
-    let start = Instant::now();
+        let start = Instant::now();
+        let rays = node_rays(&nodes, max_link_length_km).collect::<Vec<_>>();
+        println!("collected rays in {:?}", start.elapsed());
 
-    let (total_tile_ray_count, checked_tile_ray_count) = region
-        .par_coordinates()
-        .progress_count(region.area() as u64)
-        .map(|tile_coordinates| {
-            (
-                tile_coordinates,
-                load_tile(&tiles_directory, tile_coordinates),
-            )
-        })
-        .map(|(tile_coordinates, tile)| {
-            let tile_rays =
-                par_tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
+        let is_free = rays
+            .iter()
+            .map(|_| AtomicBool::new(true))
+            .collect::<Vec<_>>();
+        let start = Instant::now();
 
-            tile_rays
-                .map(|(tile_ray, ray_index)| {
-                    if is_free[ray_index].load(Ordering::Relaxed) == false {
-                        // ray already intersects in other tile
+        let (total_tile_ray_count, checked_tile_ray_count) = region
+            .par_coordinates()
+            .progress_count(region.area() as u64)
+            .map(|tile_coordinates| {
+                (
+                    tile_coordinates,
+                    load_tile(&tiles_directory, tile_coordinates),
+                )
+            })
+            .map(|(tile_coordinates, tile)| {
+                let tile_rays =
+                    par_tile_rays_for_tile(tile_coordinates, rays.par_iter().map(|ray| ray.as_ray_2()));
+
+                tile_rays
+                    .map(|(tile_ray, ray_index)| {
+                        if is_free[ray_index].load(Ordering::Relaxed) == false {
+                            // ray already intersects in other tile
+                            // `1` is for counting the tile ray
+                            // `0` indicates that this tile ray is not being checked
+                            return (1, 0);
+                        }
+
+                        let whole_ray = &rays[ray_index];
+                        // whole_ray coordinates are in tile space, where 1.0 is 1000 m
+                        let whole_ray_length_in_meters = (whole_ray.diff_x * whole_ray.diff_x
+                            + whole_ray.diff_y * whole_ray.diff_y)
+                            .sqrt()
+                            * 1_000.0;
+                        let mut start_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.start_t;
+                        let mut end_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.end_t;
+                        start_z -= curvature_drop(tile_ray.start_t, whole_ray_length_in_meters);
+                        end_z -= curvature_drop(tile_ray.end_t, whole_ray_length_in_meters);
+                        let ray = tile_ray.ray.with_z(start_z, end_z - start_z);
+                        let free = tile.is_line_free(ray);
+                        if !free {
+                            is_free[ray_index].store(false, Ordering::Relaxed);
+                        }
+
                         // `1` is for counting the tile ray
-                        // `0` indicates that this tile ray is not being checked
-                        return (1, 0);
-                    }
+                        // `1` indicates that this tile ray has been checked
+                        (1, 1)
+                    })
+                    .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1))
+            })
+            .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
 
-                    let whole_ray = &rays[ray_index];
-                    // whole_ray coordinates are in tile space, where 1.0 is 1000 m
-                    let whole_ray_length_in_meters = (whole_ray.diff_x * whole_ray.diff_x
-                        + whole_ray.diff_y * whole_ray.diff_y)
-                        .sqrt()
-                        * 1_000.0;
-                    let mut start_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.start_t;
-                    let mut end_z = whole_ray.start_z + whole_ray.diff_z * tile_ray.end_t;
-                    start_z -= curvature_drop(tile_ray.start_t, whole_ray_length_in_meters);
-                    end_z -= curvature_drop(tile_ray.end_t, whole_ray_length_in_meters);
-                    let ray = tile_ray.ray.with_z(start_z, end_z - start_z);
-                    let free = tile.is_line_free(ray);
-                    if !free {
-                        is_free[ray_index].store(false, Ordering::Relaxed);
-                    }
+        let duration = start.elapsed();
+        let free_count = is_free
+            .iter()
+            .filter(|free| free.load(Ordering::Relaxed))
+            .count();
+        let total_count = is_free.len();
+        let whole_ray_count = rays.len();
+        println!(
+            "{:.2}% free ({free_count} of {total_count})",
+            free_count as f64 / total_count as f64 * 100.0
+        );
+        println!(
+            "{:.2} tile rays checked per ray",
+            checked_tile_ray_count as f64 / whole_ray_count as f64
+        );
+        println!(
+            "{:.2} million tile rays checked per second",
+            checked_tile_ray_count as f64 / duration.as_secs_f64() / 1e6
+        );
+        println!(
+            "{:.2}% of tile rays checked ({checked_tile_ray_count} of {total_tile_ray_count})",
+            checked_tile_ray_count as f64 / total_tile_ray_count as f64 * 100.0
+        );
+        println!("took {:?}", duration);
 
-                    // `1` is for counting the tile ray
-                    // `1` indicates that this tile ray has been checked
-                    (1, 1)
-                })
-                .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1))
-        })
-        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+        // export results
+        type RayData = (u32, u32, f64);
 
-    let duration = start.elapsed();
-    let free_count = is_free
-        .iter()
-        .filter(|free| free.load(Ordering::Relaxed))
-        .count();
-    let total_count = is_free.len();
-    let whole_ray_count = rays.len();
-    println!(
-        "{:.2}% free ({free_count} of {total_count})",
-        free_count as f64 / total_count as f64 * 100.0
-    );
-    println!(
-        "{:.2} tile rays checked per ray",
-        checked_tile_ray_count as f64 / whole_ray_count as f64
-    );
-    println!(
-        "{:.2} million tile rays checked per second",
-        checked_tile_ray_count as f64 / duration.as_secs_f64() / 1e6
-    );
-    println!(
-        "{:.2}% of tile rays checked ({checked_tile_ray_count} of {total_tile_ray_count})",
-        checked_tile_ray_count as f64 / total_tile_ray_count as f64 * 100.0
-    );
-    println!("took {:?}", duration);
+        let ray_data = node_pairs(&nodes).filter_map(|(first_node, second_node)| {
+            let ray = node_ray(first_node, second_node, max_link_length_km)?;
+            let ray = ray.as_ray_2();
+            let length = (ray.diff_x * ray.diff_x + ray.diff_y * ray.diff_y).sqrt();
+            Some((first_node.database_line, second_node.database_line, length))
+        });
 
-    // export results
-    type RayData = (u32, u32, f64);
-
-    let ray_data = node_pairs(&nodes).filter_map(|(first_node, second_node)| {
-        let ray = node_ray(first_node, second_node, max_link_length_km)?;
-        let ray = ray.as_ray_2();
-        let length = (ray.diff_x * ray.diff_x + ray.diff_y * ray.diff_y).sqrt();
-        Some((first_node.database_line, second_node.database_line, length))
-    });
-
-    let mut clear = Vec::new();
-    let mut blocked = Vec::new();
-    for (index, data) in ray_data.enumerate() {
-        let is_free = is_free[index].load(Ordering::Relaxed);
-        if is_free {
-            clear.push(data);
-        } else {
-            blocked.push(data);
+        let mut clear = Vec::new();
+        let mut blocked = Vec::new();
+        for (index, data) in ray_data.enumerate() {
+            let is_free = is_free[index].load(Ordering::Relaxed);
+            if is_free {
+                clear.push(data);
+            } else {
+                blocked.push(data);
+            }
         }
-    }
 
-    fn write_ray_data(mut out: impl Write, data: impl Iterator<Item = RayData>) -> io::Result<()> {
-        for (first_node, second_node, length) in data {
-            writeln!(out, "{first_node},{second_node},{length}")?;
+        fn write_ray_data(mut out: impl Write, data: impl Iterator<Item = RayData>) -> io::Result<()> {
+            for (first_node, second_node, length) in data {
+                writeln!(out, "{first_node},{second_node},{length}")?;
+            }
+            Ok(())
         }
-        Ok(())
+
+        let export_directory = format!(
+            "/Users/leonardnolting/Development/cellfso/cache/results/lines/external/{region_name}"
+        );
+
+        create_dir_all(&export_directory).await.unwrap();
+
+        let clear_file = File::create(
+            format!("{export_directory}/clear.csv")
+        ).unwrap();
+
+        let blocked_file = File::create(
+            format!("{export_directory}/blocked.csv")
+        ).unwrap();
+
+        write_ray_data(BufWriter::new(clear_file), clear.into_iter()).unwrap();
+        write_ray_data(BufWriter::new(blocked_file), blocked.into_iter()).unwrap();
+
+        println!("Finished region {region_name}")
     }
-
-    let export_directory = format!(
-        "/Users/leonardnolting/Development/cellfso/cache/results/lines/external/{region_name}"
-    );
-
-    create_dir_all(&export_directory).await.unwrap();
-
-    let clear_file = File::create(
-        format!("{export_directory}/clear.csv")
-    ).unwrap();
-
-    let blocked_file = File::create(
-        format!("{export_directory}/blocked.csv")
-    ).unwrap();
-
-    write_ray_data(BufWriter::new(clear_file), clear.into_iter()).unwrap();
-    write_ray_data(BufWriter::new(blocked_file), blocked.into_iter()).unwrap();
 }
