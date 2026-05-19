@@ -15,6 +15,7 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
+use tokio::fs::create_dir_all;
 
 pub mod cli;
 pub mod curvature;
@@ -77,8 +78,8 @@ async fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
-    let tiles_directory = "G:\\fso\\tiles\\toulouse";
-    let nodes_file = "nodes.csv";
+    let tiles_directory = "/Volumes/Lagerstätte/fso/tiles/paris";
+    let nodes_file = "/Users/leonardnolting/Development/cellfso/export/paris/nodes.csv";
 
     std::fs::create_dir_all(tiles_directory).unwrap();
 
@@ -87,6 +88,13 @@ async fn main() {
         x_max: 685,
         y_min: 6834,
         y_max: 6903,
+    };
+
+    let region_paris_small = TileRegion {
+        x_min: 646,
+        x_max: 655,
+        y_min: 6864,
+        y_max: 6873,
     };
 
     // Recommended max link length: <5 km
@@ -111,9 +119,9 @@ async fn main() {
         y_max: 6314,
     };
 
-    let region = region_paris;
+    let region = region_paris_small;
 
-    download_tiles(tiles_directory, region_toulouse).await;
+    // download_tiles(tiles_directory, region_toulouse).await;
 
     /*for tile_coordinates in region.coordinates().progress_count(region.area() as u64) {
         // TODO
@@ -121,6 +129,9 @@ async fn main() {
     }*/
 
     let mut nodes = read_nodes(nodes_file);
+
+    println!("Loaded nodes");
+    println!("Loading tiles from {}", tiles_directory);
 
     // filter out out-of-bounds nodes
     nodes.retain(|node| {
@@ -241,8 +252,9 @@ async fn main() {
         Ok(())
     }
 
-    let clear_file = File::create("clear.csv").unwrap();
-    let blocked_file = File::create("blocked.csv").unwrap();
+    create_dir_all("/Users/leonardnolting/Development/cellfso/cache/results/lines/external/paris").await.unwrap();
+    let clear_file = File::create("/Users/leonardnolting/Development/cellfso/cache/results/lines/external/paris/clear.csv").unwrap();
+    let blocked_file = File::create("/Users/leonardnolting/Development/cellfso/cache/results/lines/external/paris/blocked.csv").unwrap();
     write_ray_data(BufWriter::new(clear_file), clear.into_iter()).unwrap();
     write_ray_data(BufWriter::new(blocked_file), blocked.into_iter()).unwrap();
 }
