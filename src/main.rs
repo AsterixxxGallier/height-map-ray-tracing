@@ -81,10 +81,12 @@ async fn main() {
 
     let region_name = "paris";
 
-    let tiles_directory = "/Volumes/Lagerstätte/fso/tiles/paris";
-    let nodes_file = "/Users/leonardnolting/Development/cellfso/export/paris/nodes.csv";
+    let tiles_directory = format!("/Volumes/Lagerstätte/fso/tiles/{region_name}");
+    let nodes_file = format!(
+        "/Users/leonardnolting/Development/cellfso/export/{region_name}/nodes.csv"
+    );
 
-    std::fs::create_dir_all(tiles_directory).unwrap();
+    std::fs::create_dir_all(&tiles_directory).unwrap();
 
     let regions: HashMap<&str, TileRegion> = HashMap::from([
         ("paris", TileRegion {
@@ -128,7 +130,7 @@ async fn main() {
         // download_tile(tiles_directory, tile_coordinates);
     }*/
 
-    let mut nodes = read_nodes(nodes_file);
+    let mut nodes = read_nodes(&nodes_file);
 
     println!("Loaded nodes");
     println!("Loading tiles from {}", tiles_directory);
@@ -159,7 +161,7 @@ async fn main() {
         .map(|tile_coordinates| {
             (
                 tile_coordinates,
-                load_tile(tiles_directory, tile_coordinates),
+                load_tile(&tiles_directory, tile_coordinates),
             )
         })
         .map(|(tile_coordinates, tile)| {
@@ -252,9 +254,20 @@ async fn main() {
         Ok(())
     }
 
-    create_dir_all("/Users/leonardnolting/Development/cellfso/cache/results/lines/external/paris").await.unwrap();
-    let clear_file = File::create("/Users/leonardnolting/Development/cellfso/cache/results/lines/external/paris/clear.csv").unwrap();
-    let blocked_file = File::create("/Users/leonardnolting/Development/cellfso/cache/results/lines/external/paris/blocked.csv").unwrap();
+    let export_directory = format!(
+        "/Users/leonardnolting/Development/cellfso/cache/results/lines/external/{region_name}"
+    );
+
+    create_dir_all(&export_directory).await.unwrap();
+
+    let clear_file = File::create(
+        format!("{export_directory}/clear.csv")
+    ).unwrap();
+
+    let blocked_file = File::create(
+        format!("{export_directory}/blocked.csv")
+    ).unwrap();
+
     write_ray_data(BufWriter::new(clear_file), clear.into_iter()).unwrap();
     write_ray_data(BufWriter::new(blocked_file), blocked.into_iter()).unwrap();
 }
