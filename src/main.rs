@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
@@ -78,48 +79,47 @@ async fn main() {
     let Args { max_link_length } = Args::parse();
     let max_link_length_km = max_link_length / 1000.0;
 
+    let region_name = "paris";
+
     let tiles_directory = "/Volumes/Lagerstätte/fso/tiles/paris";
     let nodes_file = "/Users/leonardnolting/Development/cellfso/export/paris/nodes.csv";
 
     std::fs::create_dir_all(tiles_directory).unwrap();
 
-    let region_paris = TileRegion {
-        x_min: 616,
-        x_max: 685,
-        y_min: 6834,
-        y_max: 6903,
-    };
+    let regions: HashMap<&str, TileRegion> = HashMap::from([
+        ("paris", TileRegion {
+            x_min: 616,
+            x_max: 685,
+            y_min: 6834,
+            y_max: 6903,
+        }),
+        ("paris_small", TileRegion {
+            x_min: 646,
+            x_max: 655,
+            y_min: 6864,
+            y_max: 6873,
+        }),
+        ("bordeaux", TileRegion {
+            x_min: 396,
+            x_max: 465,
+            y_min: 6379,
+            y_max: 6450,
+        }),
+        ("lyon", TileRegion {
+            x_min: 807,
+            x_max: 876,
+            y_min: 6486,
+            y_max: 6555,
+        }),
+        ("toulouse", TileRegion {
+            x_min: 539,
+            x_max: 608,
+            y_min: 6245,
+            y_max: 6314,
+        }),
+    ]);
 
-    let region_paris_small = TileRegion {
-        x_min: 646,
-        x_max: 655,
-        y_min: 6864,
-        y_max: 6873,
-    };
-
-    // Recommended max link length: <5 km
-    let region_bordeaux = TileRegion {
-        x_min: 396,
-        x_max: 465,
-        y_min: 6379,
-        y_max: 6450,
-    };
-
-    let region_lyon = TileRegion {
-        x_min: 807,
-        x_max: 876,
-        y_min: 6486,
-        y_max: 6555,
-    };
-
-    let region_toulouse = TileRegion {
-        x_min: 539,
-        x_max: 608,
-        y_min: 6245,
-        y_max: 6314,
-    };
-
-    let region = region_paris_small;
+    let region = &regions[region_name];
 
     // download_tiles(tiles_directory, region_toulouse).await;
 
